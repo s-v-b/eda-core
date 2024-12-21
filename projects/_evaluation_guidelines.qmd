@@ -1,0 +1,16 @@
+
+
+```{r}
+#| include: false
+```
+
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+|Spelling and syntax | `r scales::label_percent()(4/20)` | English/French {{<  fa pen-fancy >}}|
+|Plots correction | `r scales::label_percent()(4/20)` | choice of `aesthetics`, `geom`, `scale` ... {{<  fa chart-area >}}|
+|Plot style | `r scales::label_percent()(3/20)` | Titles, legends, labels, breaks ... {{<  fa chart-area >}} |
+|Table wrangling | `r scales::label_percent()(3/20)` | ETL, SQL like manipulations {{<  fa database >}} |
+|Computing Statistics | `r scales::label_percent()(3/20)` | Aggregations, LR, PCA, CA, ... {{<  fa chart-area >}} |
+|DRY compliance | `r scales::label_percent()(3/20)` | DRY principle at {{<  fa brands  wikipedia-w  >}} [ Wikipedia ](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)|
+

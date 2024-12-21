@@ -1,0 +1,494 @@
+---
+title: 'Bivariate analysis'
+categories: [Bivariate analysis, Boxplots, Pairplots]
+date: "`r Sys.time()`"
+
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+format:
+  html:
+    output-file: lab-bivariate.html
+  pdf:
+    output-file: lab-bivariate.pdf
+
+# params:
+#   truc: html
+#   year: 2024 
+#   curriculum: "M1 MIDS & MFA"
+#   university: "Université Paris Cité"
+#   homepage: "https://s-v-b.github.io/MA7BY020"
+#   moodle: "https://moodle.u-paris.fr/course/view.php?id=6143"
+---
+
+
+{{< include _preamble.qmd >}}
+
+::: {.callout-important}
+
+### Objectives
+
+In Exploratory analysis of tabular data, bivariate analysis is the second step. It consists in exploring, summarizing, visualizing pairs of columns of a dataset.
+
+:::
+
+
+## Setup
+
+```{r setup-packages}
+#| warning: false
+#| message: false
+#| collapse: true
+stopifnot(
+  require(tidyverse), 
+  require(glue),
+  require(magrittr),
+  require(lobstr),
+  require(arrow),
+  require(ggforce),
+  require(vcd),
+  require(ggmosaic),
+  require(httr),
+  require(patchwork)
+)
+
+```
+
+
+
+Bivariate techniques depend on the types of columns we are facing.
+
+
+For *numerical/numerical* samples 
+
+- Scatter plots
+- Smoothed lineplots (for example linear regression)
+- 2-dimensional density plots
+
+For *categorical/categorical* samples : mosaicplots and variants
+
+For *numerical/categorical* samples
+
+- Boxplots per group
+- Histograms per group
+- Density plots per group
+- Quantile-Quantile plots
+
+
+# Dataset
+
+Once again we rely on the Census dataset.
+
+> Since 1948, the US Census Bureau  carries out a monthly Current Population Survey,  collecting data concerning residents aged above 15  from $150 000$ households.  This survey is one of the most important sources of information concerning the american workforce. Data reported in file `Recensement.txt`  originate from the 2012 census. 
+
+Load the data into the session environment and call it `df`. Take advantage 
+of the fact that we saved the result of our data wrangling job in a self-documented file format. Download a `parquet` file from the following URL: 
+
+`https://stephane-v-boucheron.fr/data/Recensement.parquet`
+
+::: {.callout-tip}
+
+Use `httr::GET()` and `WriteBin()`. 
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="Solution" collapse="true"}
+
+
+
+
+```{r}
+#| echo: false
+
+if (fs::dir_exists('DATA')){
+  datapath <- "DATA"
+} else {
+  datapath <- "../DATA"
+}
+```
+
+
+```{r}
+fname <- "Recensement.parquet"
+
+fpath <- paste(datapath, fname, sep="/")
+
+if (!file.exists(fpath)) {
+  tryCatch(expr = { 
+    url <- 'https://stephane-v-boucheron.fr/data/Recensement.parquet'
+
+    rep <- httr::GET(url)
+    stopifnot(rep$status_code==200)
+    
+    con <- file(fpath, open="wb")
+    writeBin(rep$content, con)
+    close(con)
+  }, warning = function(w) {
+    glue("Successful download but {w}")
+  }, error = function(e) {
+    stop("Houston, we have a problem!")    # error-handler-code
+  }, finally = {
+    if (exists("con") && isOpen(con)){
+      close(con)
+    }
+  } 
+  )
+} 
+
+df <- arrow::read_parquet(fpath)
+```
+
+
+
+
+```{r}
+#| mesage: false
+#| collapse: true
+
+df |>
+  glimpse()
+
+df |>
+  head()
+```
+
+:::::
+
+:::
+
+# Categorical/Categorical pairs
+
+
+```{r}
+df |> 
+  select(where(is.factor)) |>
+  head()
+```
+
+Explore the connection between `CATEGORIE` and `SEX`. 
+Compute the 2-ways contingency table using `table()`, and  `count()` from `dplyr`. 
+
+Use `tibble::as_tibble()` to transform the output of `table()` into a dataframe/tibble.
+
+Use `tidyr::pivot_wider()` so as to obtain a wide (but messy) tibble with the same the same shape as the output of `table()`. Can you spot a difference? 
+
+::: {.content-visible when-profile="solution"}  
+
+::::: {.callout-tip title="Solution"}
+
+
+```{r}
+tb <- df |>
+  dplyr::select(CATEGORIE, SEXE) |>
+  table() 
+
+# tb
+```
+
+
+```{r}
+tb2 <- df |>
+  count(CATEGORIE, SEXE)
+
+tb2
+```
+
+
+
+```{r}
+tb2 |> 
+  pivot_wider(id_cols=CATEGORIE, 
+              names_from=SEXE, 
+              values_from=n)
+
+```
+
+:::::
+
+:::
+
+Use `mosaicplot()` from base `R` to visualize the contingency table. 
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+mosaicplot(~ CATEGORIE + SEXE, 
+           tb, 
+           main="Données Recensement")
+
+mosaicplot(~ SEXE + CATEGORIE, tb)
+```
+
+:::
+
+:::::
+
+Use `geom_mosaic` from `ggmosaic` to visualize the contingency table
+
+- Make the plot as readable as possible
+- Reorder `CATEGORIE` acccording to counts
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+#| warning: true
+#| eval: true
+rot_x_text <- theme(
+  axis.text.x = element_text(angle = 45)
+)
+```
+
+```{r}
+df |>
+  ggplot() +
+  geom_mosaic(aes(x=product(SEXE, CATEGORIE), fill=SEXE)) +
+  rot_x_text  
+```
+
+
+:::
+
+:::::
+
+- Collapse rare levels of `CATEGORIE` (consider that a level 
+is rare if it has less than 40 occurrences). Use tools from `forcats`. 
+  
+::::: {.content-visible when-profile="solution"}  
+  
+::: {.callout-tip title="Solution"}
+ 
+ 
+```{r}  
+df |> 
+  count(CATEGORIE) |> 
+  arrange(desc(n))
+
+rare_categories <- df |> 
+  count(CATEGORIE) |>
+  filter(n<=40)
+
+rare_categories
+```
+
+```{r}
+df <- df |> 
+  mutate(CATEGORIE=fct_lump_min(CATEGORIE, 
+                                min=40, 
+                                other_level = "Primary-Secondary")) 
+
+tb <- df |>
+  select(CATEGORIE, SEXE) |> 
+  table()
+
+df |>
+  count(CATEGORIE, SEXE)
+```
+  
+```{r}
+mosaicplot(~ CATEGORIE + SEXE, df)
+```
+
+
+:::
+  
+  
+:::::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+vcd::mosaic(formula=SEXE~CATEGORIE,
+            data=table(select(df, CATEGORIE, SEXE)))
+```
+
+:::
+
+:::::
+
+# Testing association
+
+
+## Chi-square independence/association test 
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+
+```{r}
+test_1 <- df |>
+  select(CATEGORIE, SEXE) |>
+  table() |>
+  chisq.test()
+
+# test_1 
+
+test_1 |>
+  broom::tidy() |>
+  knitr::kable()
+
+```
+
+
+
+:::
+
+The Chi-square statistics can be computed from the contingeny table 
+
+::: {.callout-tip}
+
+```{r}
+rowcounts <- apply(tb, MARGIN = 1, FUN = sum)
+colcounts <- apply(tb, MARGIN = 2, FUN = sum)
+
+expected <- (rowcounts %*% t(colcounts))/sum(colcounts)
+
+# norm((tb - expected) / sqrt(expected), type = "F")^2
+
+expected |>
+  as_tibble() |>
+  knitr::kable()
+```
+
+:::
+
+:::::
+
+
+# Categorical/Numerical pairs
+
+## Grouped boxplots 
+
+Plot boxplots of `AGE` according to `NIV_ETUDES`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+df |>
+  ggplot() +
+  aes(x=NIV_ETUDES, y=AGE) +
+  geom_boxplot() +
+  rot_x_text
+```
+```{r}
+df |>
+  ggplot() +
+  aes(x=fct_infreq(NIV_ETUDES), y=AGE) +
+  geom_boxplot(varwidth = T) +
+  rot_x_text
+```
+:::
+
+:::::
+
+Draw density plots of `AGE`, facet by `NIV_ETUDES` and `SEXE`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+p <- df |> 
+  ggplot() +
+  aes(x=AGE) +
+  stat_density(fill="white", color="black") +
+  facet_grid(rows=vars(NIV_ETUDES), 
+             cols=vars(SEXE))
+
+p
+```
+
+:::
+
+:::::
+
+Collapse rare levels of `NIV_ETUDES` and replay.
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+p %+% (df |> 
+  mutate(NIV_ETUDES = fct_lump_min(NIV_ETUDES, min=30)) )
+```
+
+
+
+:::
+
+:::::
+
+
+# Numerical/Numerical pairs
+
+Make a scatterplot of `SAL_HOR`with respect to `AGE`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip}
+
+```{r}
+df |> 
+  ggplot() +
+  aes(x=AGE, y=SAL_HOR, color=SEXE) +
+  geom_point(alpha=.7)
+```
+
+
+:::
+
+
+:::::
+
+
+# `pairs` from base `R`
+
+
+# `ggpairs()`
+
+# Useful links
+
+- [rmarkdown](bookdown.org/yihui/rmarkdown)
+- [dplyr](https://gplot2.tidyverse.org)
+- [ggplot2](https://ggplot2.tidyverse.org)
+- *R Graphic Cookbook*. Winston Chang. O' Reilly.
+- [A blog on ggplot object](https://www.data-imaginist.com/2017/Beneath-the-canvas/)
+- [`skimr`]()
+- [`vcd`]()
+- [`ggmosaic`]()
+- [`ggforce`]()
+- [`arrow`]()
+- [`httr`]()
+
+
+
+```{r}
+expand.grid(levels(df$CATEGORIE), levels(df$SEXE))
+```
+
+```{r}
+df |> 
+  select(CATEGORIE, SEXE) |> 
+  table() |> 
+  mosaicplot()
+```
+```{r}
+pchisq(140, df=5, lower.tail = F)
+```
+

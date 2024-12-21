@@ -1,0 +1,22 @@
+
+::: {layout="[80,20]"}
+
+::: {#first-column}
+
+|                            |
+|:---------------------------|
+| {{< var curriculum >}}     |
+| {{< var university >}}     |
+| [Année {{< var year >}}]() |
+| {{< var homepage >}}       |
+| {{< var moodle >}}         |
+
+
+::: 
+
+::: {#second-column}
+![](/images/UniversiteParis_monogramme_couleur_RVB.png){align="right" style="size:50px;" width=75}
+:::
+
+:::
+

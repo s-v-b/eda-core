@@ -1,0 +1,41 @@
+format:
+  html:
+    highlight-style: zenburn
+    code-fold: true
+    code-link: true
+    code-annotations: hover
+  pdf:
+    highlight-style: arrow
+    code-fold: false
+    toc: false
+    keep-tex: false
+    documentclass: exam
+    classoption: [11pt,titlepage=false]
+    include-in-header: 
+      - file: macros.tex
+    include-before-body: 
+      - text: "\\renewcommand{\\contentsname}{}"
+
+
+prefer-html: true
+
+
+toc: true
+toc-depth: 2
+toc-collapse: 1
+toc-title: "ToC"
+
+embed-resources: true
+
+engine: knitr
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+  freeze: auto
+  cache: true
+
+callout-appearance: simple
+
+
