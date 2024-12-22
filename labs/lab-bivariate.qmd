@@ -437,6 +437,8 @@ p %+% (df |>
 
 # Numerical/Numerical pairs
 
+## Scatterplots
+
 Make a scatterplot of `SAL_HOR`with respect to `AGE`
 
 ::::: {.content-visible when-profile="solution"}  
@@ -455,6 +457,13 @@ df |>
 
 
 :::::
+
+
+## Correlations
+
+- Linear correlation coefficient (Pearson $\rho$)
+- Linear rank correlation coefficient (Spearman, Kendall)
+- $\xi$ rank correlation coefficient (Chatterjee)
 
 
 # `pairs` from base `R`
