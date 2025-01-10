@@ -15,14 +15,9 @@ execute:
   eval: true
   echo: true
   collapse: true
-  
-# params:
-#   truc: html
-#   year: 2024
-#   curriculum: "M1 MIDS & MFA"
-#   university: "Université Paris Cité"
-#   homepage: "https://s-v-b.github.io/MA7BY020"
-#   moodle: "https://moodle.u-paris.fr/course/view.php?id=6143"
+
+
+
 ---
 
 
@@ -64,12 +59,6 @@ Grammar of Graphics approach
 
 ::: {.content-visible when-format="html"} 
 
-```{r}
-#| label: rossling
-#| eval: false
-#| echo: false
-knitr::include_url("https://www.youtube.com/embed/jbkSRLYSojo")
-```
 
 {{< video  https://www.youtube.com/embed/jbkSRLYSojo >}}
 
@@ -259,7 +248,7 @@ have null content
 #| results: markup
 #| collapse: true
 #| echo: true
-#| 
+#| label: gapminder_schema
 gapminder |> 
   filter(FALSE) |> 
   glimpse()
@@ -364,6 +353,8 @@ Extract/filter a subset of rows using `dplyr::filter(...)`
 ```{r}
 #| label: gapminder_td
 #| results: markup
+# q: in gapminder table extract all raws concerning France
+
 gapminder |> 
   filter(country=='France') |> 
   head()
@@ -398,6 +389,7 @@ the row index by a condition statement (a logical expression) also called a mask
 ```{r}
 #| label: gapminder_filtered
 #| results: markup
+# q: in gapminder table extract all raws concerning year 2002
 gapminder_2002 <- gapminder[gapminder$year==2002, ]
 ```
 
@@ -424,9 +416,12 @@ on each row of $\text{Table}$. In `SQL`, the relational expression would
 translate into
 
 ```{.sql}
-SELECT *
-FROM Table
-WHERE condition
+SELECT 
+  *
+FROM 
+  Table
+WHERE 
+  condition
 ```
 
 Check [Package `dplyr`
@@ -462,7 +457,7 @@ gapminder |>
 ### Data masking
 
 Note that in stating the condition, we simply write `year==2002` even though 
-`year` is not the name of an object in our current session. This is possible because `filter( )` uses *data masking*, `year` is meant to denote a column in `gapminder`.
+`year` is not the name of an object in our current session. This is possible because `filter( )` uses *data masking*, `year` is meant to denote a column in `gapminder`. SQL interpreters use the same mechanism.
 
 The ability to use data masking is one of the great strengths of the `R` programming language.
 
@@ -490,7 +485,6 @@ by Rosling's presentation.
 
 ```{r}
 #| label: bad
-
 
 p <- gapminder_2002 |>
   ggplot() 
@@ -521,7 +515,7 @@ In `ggplot2` parlance, this is called *aesthetic mapping*.  Use `aes()`.
 ::: {.callout-tip title="solution"}
 ```{r}
 #| label: båd-1stlayer
-#| 
+# q: Map variables gdpPercap and lifeExp to axes x and y. Define the axes.
 p <- p +
   aes(x=gdpPercap, y=lifeExp)
 
@@ -577,11 +571,11 @@ We are building a graphical object (a `ggplot` object) around a data
 frame (`gapminder`)
 
 We supply *aesthetic mappings* (`aes()`) that can be either global or
-bound to some *geometries* (`geom_point()`)or *statistics*
+specifically bound to some *geometries* (`geom_point()`) or *statistics*
 
-The global aesthetic mapping defines which columns are
+The global aesthetic mapping defines which columns (variables) are
 
--   mapped to which axes,
+-   mapped to position (which columns are mapped to axes),
 -   possibly mapped to colours, linetypes, shapes, ...
 
 Geometries and Statistics describe the building blocks of graphics
@@ -628,6 +622,9 @@ p <- p +
 
 p
 ```
+
+Note that we only use global aesthetic mappings. This makes sense since we do not need to taylor aesthetics to specific geometries. Indeed we only have one geometry in our graphical object.
+
 :::
 :::
 
@@ -651,7 +648,7 @@ along the coordinate axes provide enough information.
 
 ## Scaling
 
-In order to pay tribute to Hans Rosling, we need to take care of two
+To pay tribute to Hans Rosling, we need to take care of two
 *scaling* issues:
 
 -   the gdp per capita axis should be *logarithmic* `scale_x_log10()`
@@ -670,10 +667,11 @@ In order to pay tribute to Hans Rosling, we need to take care of two
 
 ```{r}
 #| label: better-with-scaling
-
+# q: use logarithmic scale for both axes
 p <- p +
   scale_x_log10() +
-  scale_size_area()
+#  scale_size_area() +
+  ggtitle("Gapminder 2002, scaled")
 
 p
 ```
@@ -700,13 +698,19 @@ Motivate the proposed scalings.
 
 ::: {.callout-tip title="solution"}
 
+To see why using `scale_size_area()` is important, we can check what happens when we use `scale_size()` instead.
+
 ```{r}
 #| label: better-with-bad-scaling
- 
+pop_range <- c(0, max(gapminder_2002$pop))
+
 p +
-  scale_radius()
+  scale_radius(limits = pop_range) + 
+  ggtitle("scale_radius")
 
 ```
+
+With `scale_size_area()`, the area of the point is proportional to the value of the variable mapped to `size`. With `scale_size()`, the radius of the point is proportional to the value of the variable mapped to `size`, so the area is proportional to the square of the value of the variable. This tends to exaggerate the differences between the sizes of the points. This is a way of lying with statistics.
 
 :::
 
@@ -721,12 +725,42 @@ We use package `patchwork` to collect and present several graphical objects.
 ```{r}
 #| label: better-with-bad-scaling-patchwork
 
-ptchwrk <- (p + ggtitle("scale_size_area")) + (p + scale_size() + ggtitle("scale")) 
+ptchwrk <- (
+  p + 
+  scale_size(limits = pop_range) + 
+  ggtitle("scale_size")) + 
+  (p + 
+  scale_radius(limits = pop_range) + 
+  ggtitle("scale_radius")) 
 
 ptchwrk + plot_annotation(
-  title='Comparing scale_size_area and scale_size', 
+  title='Comparing scale_size and scale_radius', 
+  caption='In the current setting, scale_size() should be favored'
+)
+```
+According to the documentation, `scale_size_area()` ensures that a value of $0$ is mapped to a size of $0$. This is not the case with `scale_size()`.
+
+```{r}
+#| label: even-better-with-scaling
+ptchwrk <- (
+  p + 
+  scale_size(limits = pop_range) + 
+  ggtitle("scale_size")) + 
+  (p + 
+  scale_size_area() + 
+  ggtitle("scale_size_area")) 
+
+ptchwrk + plot_annotation(
+  title='Comparing scale_size and scale_size_area', 
   caption='In the current setting, scale_size_area() should be favored'
 )
+
+```
+```{r}
+#| label: choose-scale_size_area
+
+p <- p + 
+  scale_size_area() 
 ```
 
 :::
@@ -740,11 +774,25 @@ ptchwrk + plot_annotation(
 
 ### Question
 
--   Add a plot title
--   Make axes titles
-    -   explicit
-    -   readable
--   Use `labs(...)`
+Using copilots completions, we can summarize the construcion of the graphical object in a series of questions.
+
+```
+# q: Define a plot with respect to table gapminder_2002 along the lines suggested by Rosling's TED presentation
+# q: Map variables gdpPercap and lifeExp to axes x and y. Define the axes. 
+# q: For each row, draw a point at coordinates defined by the mapping.
+# q: Map continent to color
+# q: Map pop to bubble size
+# q: Make point transparent by tuning alpha (inside geom_point() avoid overplotting)
+# q: Add a plot title
+# q: Make axes titles explicit and readable
+# q: Use labs(...)  
+# q: Use scale_x_log10() and scale_size_area()
+# q: Fine tune the guides: replace pop by Population and titlecase continent
+# q: Use theme_minimal()
+# q: Use scale_color_manual(...) to fine tune the color aesthetic mapping.
+# q: Use facet_zoom() from package ggforce
+# q: Add labels to points. This can be done by aesthetic mapping. Use aes(label=..)
+```
 
 
 :::
@@ -780,8 +828,14 @@ titlecase `continent`.
 
 
 ```{r}
-# TODO: fine tune the guides: replace `pop` by `Population` and titlecase `continent`.
-
+#| label: guides_tuning
+# q: fine tune the guides: replace `pop` by `Population` and titlecase `continent`.
+p <- p +
+  guides(color = guide_legend(title = "Continent",
+                              override.aes = list(size = 5),
+                              order = 1),
+         size = guide_legend(title = "Population",
+                             order = 2))
 ```
 
 :::
@@ -796,6 +850,31 @@ What should be the respective purposes of Title, Subtitle, Caption, ... ?
 
 :::
 
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title="solution"}
+
+-   The title should be explicit and concise. It should summarize the
+    content of the graphic object. Our title here "The world in year 2002" is concise but not explicit enough. The world may signify widely different things. Here, we mean world countries
+
+-   The subtitle should provide additional information: "Public health does not boil down to GDP per capita"
+
+-   The caption should provide additional information. Here we could explain the meaning of the axes, the color scale, the size scale, ... provided guides are not enough. Here we could spot the source(s) of the data: UNO, WHO, World Bank, ..., Gapminder foundation.
+
+```{r}
+#| label: title-subtitle-caption
+
+p <- p +
+  labs(
+    subtitle="Public health does not boil down to GDP per capita",
+    caption="Source: Gapminder Foundation through Gapminder package"
+  )
+p
+```
+
+::: 
+:::::
 
 ## Theming using `ggthemes` (or not)
 
@@ -975,13 +1054,13 @@ p +
    ggrepel::geom_label_repel(max.overlaps = 5) + #<<
    scale_size_area(max_size = 15,
                   labels= scales::label_number(scale=1/1e6,
-                                               suffix=" M")) +
-   scale_color_manual(values = neat_color_scale) +
-   theme(legend.position = "none") +
-    labs(title= glue("Gapminder  {min(gapminder$year)}-{max(gapminder$year)}"),
-         x = "Yearly Income per Capita",
-         y = "Life Expectancy",
-       caption="From sick  and poor (bottom left) to healthy and rich (top right)")
+                                               suffix=" M"))  #+
+  # scale_color_manual(values = neat_color_scale) +
+  # theme(legend.position = "none") +
+    # labs(title= glue("Gapminder  {min(gapminder$year)}-{max(gapminder$year)}"),
+    #      x = "Yearly Income per Capita",
+    #      y = "Life Expectancy",
+    #    caption="From sick  and poor (bottom left) to healthy and rich (top right)")
 ```
 
 :::
@@ -1149,6 +1228,17 @@ q <- filter(gapminder, FALSE) |>
 :::
 
 :::
+
+## Suggestions
+
+Think about ways to visualize specific aspects of the gapminder data. 
+
+- How could you overlay the world in 1952 and 2007?
+- How could you visualize the evolution of life expectancy and population across the different countries?
+- Visualize the evolution of former colonies and their colonizers.
+- Visualize the evolution of countries from the former Soviet Union, Warsaw Pact, and Yugoslavia.
+- Visualize the evolution of countries from the former British Empire.
+
 
 
 ## More material
