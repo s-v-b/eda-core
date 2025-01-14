@@ -27,13 +27,7 @@ format:
   pdf:
     output-file: lab-r-intro.pdf
 prefer-html: true
-# params:
-#   truc: html
-#   year: 2024 
-#   curriculum: "M1 MIDS"
-#   university: "Université Paris Cité"
-#   homepage: "https://s-v-b.github.io/MA7BY020"
-#   moodle: "https://moodle.u-paris.fr/course/view.php?id=6143"
+
 engine: knitr
 ---
 
@@ -52,19 +46,18 @@ This workbook intends to walk you through basic aspects of the `R` language and 
 
 ## Packages
 
-Base `R` can do a lot. But the full power of `R` comes
-from a fast growing collection of `packages`.
+Base [`R`](https://r-project.org) can do a lot. But the full power of `R` comes
+from a [fast growing collection of `packages`](https://cran.r-project.org/web/packages/available_packages_by_date.html).
 
-Packages are first *installed* (that is downloaded from `cran` and copied somewhere on the hard drive), and if
-needed, *loaded* during a session.
+Packages are first *installed* (that is downloaded from `cran` and copied somewhere on the hard drive), and if needed, *loaded* during a session.
 
 - Installation can usually be performed using command `install.packages()`. In some circumstances, ad hoc installation commands (often from packages  `devtools`) are needed
-- Package `pak` offers an insteresting alternative to base `R` `install.packages()`
-- Once a package has been installed/downloaded on your drive
+- Package `pak` offers an interesting alternative to base `R` `install.packages()`
+- Once a package has been installed/downloaded on your hard drive
   + if you want all objects exported by the package to be available in your session, you should *load* the package, using `library()` or `require()` (what's the difference?). Technically, this loads the `NameSpace` defined by the package.
   + if you just want to pick some objects exported from the package, you can use *qualified names* like `package_name::object_name` to access the object (function, dataset, ...). 
  
-For example. when we write 
+For example, when we write 
 
 ```{.r}  
 gapminder <- gapminder::gapminder
@@ -78,6 +71,7 @@ Function `p_load()` from `pacman` (package manager) blends installation and load
 
 
 ```{r}
+#| label: install-pak
 if (! require(pak)){
   install.packages("pak")
 }
@@ -106,13 +100,12 @@ stopifnot(
 
 ### Optional arguments
 
-A very nice feature of `R` is that functions from base `R` as well as from packages have *optional* arguments with sensible *default* values. Look for example at documentation of `require()` using expression
-`?require`.
+A very nice feature of `R` is that functions from base `R` as well as from packages have *optional* arguments with sensible *default* values. Look for example at documentation of `require()` using expression `?require`.
 
-Optional settings may concern individual functions or the collection of functions exported by some packages. In the next *chunk*, we reset the 
-default color scales used by graphical functions from `ggplot2`.
+Optional settings may concern individual functions or the collection of functions exported by some packages. In the next *chunk*, we reset the default color scales used by graphical functions from `ggplot2`.
 
 ```{r}
+#| label: setup-options
 #| eval: true
 opts <- options()  # save old options
 
@@ -213,7 +206,7 @@ ls()
 
 ```{r, three-vectors}
 #| eval: true
-#| include: false
+#| include: true
 ```
 The chunks adds three identifiers `x,y,z` to the global environment. 
 Identifiers are bound to `R` objects which turn out to be numerical vectors. 
@@ -285,6 +278,7 @@ Package `lobstr` lets us explore low-level aspects of `R` (and much more). Funct
 ```
 
 ```{r}
+#| label: lobstr-1
 #| eval: true
 #| collapse: false 
 lobstr::obj_addr(w)
@@ -294,6 +288,7 @@ lobstr::obj_addr(y)
 Now, if we modify either `y` or `w`
 
 ```{r}
+#| label: lobstr-2
 #| eval: true
 #| collapse: false
 y <- y + 1
@@ -301,7 +296,7 @@ identical(y, w)
 c(lobstr::obj_addr(w), lobstr::obj_addr(y))
 ```
 
-The adress associated with `y` has changed!
+The address associated with `y` has changed!
 
 :::::
 
@@ -309,7 +304,7 @@ The adress associated with `y` has changed!
 
 ### {{< fa hand-point-right >}}
 
-The meaning  of assignment in `R` differs from its countrepart in `Python`
+The meaning  of assignment in `R` differs from its counterpart in `Python`. In `Python`, assignment is shallow. In `R`, assignment creates a new identifier bound to the same object as the right-hand side of the assignment. If either side of the assignment is modified, it is copied to a new object before modification. This is called *copy-on-modify*.
 
 :::
 
@@ -319,10 +314,11 @@ The meaning  of assignment in `R` differs from its countrepart in `Python`
 
 Slicing a vector can be done in two ways:
 
-- providing a vector of indices to be selected. Indices need not be consecutive
-- providing a Boolean mask, that is a logical vector to select a set of positions
+- providing a vector of indices to be selected. Indices need not be consecutive.
+- providing a Boolean mask, that is a logical vector to select a set of positions.
 
 ```{r}
+#| label: slicing-1
 #| eval: true
 #| collapse: false
 x <- c(1, 2, 12) ; y <- 5:7 ; z <- 10:1
@@ -335,7 +331,7 @@ x <- c(1, 2, 12) ; y <- 5:7 ; z <- 10:1
 Explain the next lines
 
 ```{r}
-#| label: slicing
+#| label: slicing-2
 #| eval: false
 #| collapse: false
 z[1]   # slice of length 1
@@ -353,13 +349,13 @@ z[c(2, 1, 1)]
 
 ::::: {.callout title="Solution" collapse="false"}
 
-```{r, slicing}
+```{r, slicing-2}
 #| eval: true
 #| include: false
 ```
 
 - Indices start at `1` (not like in `C`, `Java`, or `Python`)
-- `z[0]` does not return an Error message. It returns an empty vector with the same basetype as `x`
+- {{< fa hand-point-right >}} `z[0]` does not return an Error message. It returns an empty vector with the same basetype as `x`
 - `z[x]` returns a vector made of `z[x[1]], z[x[2]]` and `z[x[3]]==z[12]`. Note again that `z[12]` does not raise an exception. It is simply not available (`NA`). 
 - `x %% 2` returns `1 0 0` as `%%` stands for `mod`. `z[x %% 2]` returns the same thing as `z[1]`
 
@@ -381,11 +377,12 @@ If the length of mask and and the length of the sliced vector do not coincide, w
 
 ::::: {.callout title="Solution" collapse="false"}
 
-No error is signalled, the returned sequence is as long as the number of truthies in the mask. 
+No error is signaled, the returned sequence is as long as the number of truthies in the mask. 
 
 Out of bound truthies show up as `NA`
 
 ```{r}
+#| label: masking
 #| eval: true
 #| collapse: false
 z[rep(c(TRUE, FALSE), 6)]
@@ -402,6 +399,7 @@ z[rep(c(TRUE, FALSE), 6)]
 A scalar is just a vector of length $1$!
 
 ```{r}
+#| label: scalar
 #| eval: true
 #| collapse: false
 class(z)
@@ -519,6 +517,7 @@ Reverse the entries of a vector. Find two ways to do that.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: reverse
 #| eval: true
 #| collapse: false
 z[seq(length(z), 1, by=-1)]
@@ -531,7 +530,7 @@ rev(z)   # the simplest way, once you know rev()
 :::
 
 In statistics, machine learning, we are often faced with the task of 
-building grid of regularly spaced elements (these elements can be numeric or not). `R` offers a collection of tools to perform this. The most basic tool is `rep()`.
+building grids of regularly spaced elements (these elements can be numeric or not). `R` offers a collection of tools to perform this. The most basic tool is `rep()`.
 
 ::: {.callout-note}
 
@@ -547,6 +546,7 @@ building grid of regularly spaced elements (these elements can be numeric or not
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: rep-101
 #| eval: true
 #| collapse: false
 w <- c(1, 7, 9)
@@ -557,6 +557,7 @@ rep(w, rep(2, length(w)))
 Now, we can try something more fancy. 
 
 ```{r}
+#| label: rep-102
 #| eval: true
 #| collapse: false
 rep(w, 1:3)
@@ -570,6 +571,7 @@ What are the requirements on the second (`times`) argument?
 
 Let us remove objects from the global environment.
 ```{r}
+#| label: cancel-culture
 #| eval: true
 #| collapse: false
 rm(w, x, y ,z)
@@ -592,25 +594,17 @@ To check whether a vector is made  of `numeric` or of `integer`, use `is.numeric
 Explain the outcome of the next chunks
 
 ```{r}
+#| label: classy-numbers
 #| eval: true
 #| collapse: false
 #| include: true
 class(113L) ; class(113) ; class(113L + 113) ; class(2 * 113L) ; class(pi) ; as.integer(pi)
 ```
 
-```{r}
-#| eval: true
-#| collapse: false
-class(as.integer(113))
-```
+
 
 ```{r}
-#| eval: true
-#| collapse: false
-pi ; class(pi)
-```
-
-```{r}
+#| label: classy-floors
 #| eval: true
 #| collapse: false
 floor(pi) ; class(floor(pi)) # mind the floor
@@ -620,6 +614,7 @@ floor(pi) ; class(floor(pi)) # mind the floor
 ## Integer arithmetic
 
 ```{r}
+#| label: integer-arithmetic
 #| eval: true
 #| collapse: false
 29L * 31L ; 899L %/% 32L ; 899L %% 30L
@@ -632,6 +627,7 @@ floor(pi) ; class(floor(pi)) # mind the floor
 `R` numerics are not the real numbers from Mathematics
 
 ```{r}
+#| label: nuts-bolts
 #| eval: true
 #| collapse: false
 .Machine$double.eps
@@ -651,6 +647,7 @@ typeof(c(u, v, w))
 `R` is (sometimes) able to make sensible use of Infinite.
 
 ```{r}
+#| label: infinite
 #| eval: true
 #| collapse: false
 log(0)
@@ -671,6 +668,7 @@ is.nan(c(NaN,1,10))
 Summing, scalar multiplication
 
 ```{r}
+#| label: vector-computing
 #| eval: true
 #| collapse: false
 x <- 1:3
@@ -701,6 +699,7 @@ How would you compute a factorial?
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: factorial
 #| eval: true
 #| collapse: false
 n <- 10
@@ -726,6 +725,7 @@ Approximate $\sum_{n=1}^\infty 1/n^2$ within $10^{-3}$?
 $$\sum_{n > N} \frac{1}{n^2} < \sum_{n > N} \frac{1}{n(n-1)} = \sum_{n > N} \left(\frac{1}{n-1}-\frac{1}{n}\right) = \frac{1}{N}$$
 So we may pick $N=1000$. 
 ```{r}
+#| label: second-harmonic-numbers
 #| eval: true
 #| collapse: false
 sum(x*y) # inner product
@@ -754,9 +754,10 @@ How would you compute the inner product between two (atomic numeric) vectors?
 
 ::::: {.callout title="Solution" collapse="false"} 
 
-Inner product between two vectors can be computed as a matrix product between a row vector and a column vector using `%*%`. Is this a good idea. 
+Inner product between two vectors can be computed as a matrix product between a row vector and a column vector using `%*%`. Is this a good idea?
 
 ```{r}
+#| label: inner-product
 #| eval: true
 #| collapse: false
 matrix(w, ncol=3) %*% matrix(y, nrow=3) == sum(w * y)
@@ -781,6 +782,7 @@ What we have called `vectors` so far are indeed `atomic vectors`.
 `R` offers a `matrix` class. 
 
 ```{r}
+#| label: matrix-creation
 #| eval: true
 #| collapse: false
 A <- matrix(1:50, nrow=5)
@@ -820,6 +822,7 @@ v
 A matrix can be transposed
 
 ```{r}
+#| label: transpose
 #| eval: true
 #| collapse: false
 t(v)  # transpose 
@@ -840,6 +843,8 @@ A <- matrix(1, nrow=5, ncol=2) ; A
 Comment the next chunk
 
 ```{r}
+#| label: mem-usage
+#| eval: true
 m1 <-lobstr::mem_used()
 A <- matrix(rnorm(100000L), nrow=1000L)
 m2 <- lobstr::mem_used()
@@ -852,12 +857,14 @@ m2-m1 ; m3-m2
 
 :::
 
+::: {.content-hidden}
 ::: {.callout-note}
 
 ### {{< fa brands python >}}
 
 <!-- TODO -->
 
+:::
 :::
 
 ::: {.callout-note}
@@ -870,7 +877,7 @@ m2-m1 ; m3-m2
 ```{r}
 #| eval: true
 #| collapse: false
-
+#| label: matrix-assignment
 A <- matrix(rnorm(16), nrow=4)
 A[] <- 0 ; A
 A   <- 0 ; A
@@ -900,6 +907,7 @@ The second assignment binds `0` to name `A`
 What is the final shape of `A`?
 
 ```{r}
+#| label: matrix-assignment-2
 #| eval: false
 #| collapse: false
 A <- matrix(1, nrow=5, ncol=2) 
@@ -914,6 +922,7 @@ A
 We can easily generate diagonal matrices and constant matrices.
 
 ```{r}
+#| label: diagonal-matrix
 #| eval: true
 #| collapse: false
 diag(1, 3)  # building identity matrix
@@ -935,6 +944,7 @@ B <- A[]
 B ; A
 lobstr::obj_addr(B) ; lobstr::obj_addr(A)
 B <- A
+lobstr::obj_addr(B) ; lobstr::obj_addr(A)
 ```
 
 :::
@@ -1022,6 +1032,7 @@ How would you create a fresh copy of a matrix?
 ### Solution
 
 ```{r}
+#| label: fresh-copy
 A <- matrix(rnorm(10), ncol=2L)
 B <- matrix(0, nrow=5L, ncol=2L)
 
@@ -1042,6 +1053,7 @@ all(B==A) ; identical(A, B) ; lobstr::obj_addrs(list(A, B))
 : `%*%` stands for matrix multiplication. In order to use it, the two matrices should have conformant dimensions.
 
 ```{r}
+#| label: matrix-product
 #| eval: true
 #| collapse: false
 t(v) %*% A
@@ -1071,6 +1083,7 @@ In `R`, `trace()` does not return the trace of a matrix! Function is used for de
 Just remember that the trace of a matrix is the sum of its diagonal elements. 
 
 ```{r}
+#| label: hilbert-schmidt
 #| eval: true
 #| collapse: false
 A <- matrix(runif(6), 2, 3)
@@ -1126,6 +1139,7 @@ Use `solve(A)` which is a shorthand for `solve(A, diag(1, nrow(3)))`.
 ### Solution
 
 ```{r}
+#| label: logicals
 #| eval: true
 #| collapse: false
 w <- c(TRUE, FALSE, FALSE)
@@ -1230,10 +1244,11 @@ Look at the definition of `all` and `any`.
 
 ::::: {.callout title="Solution" collapse="false"}
  
-A square matrix is symmteric iff it is equal to its transpose. 
+A square matrix is symmetric iff it is equal to its transpose. 
 Recall that `t(A)` denotes the transpose of matrix `A`. 
 
 ```{r}
+#| label: symmetry
 #| eval: true
 #| collapse: false
 #| 
@@ -1282,6 +1297,8 @@ rlang::is_atomic(y)
 rlang::is_list(y)
 ```
 
+
+
 :::
 
 ::: {.content-visible when-profile='solution'} 
@@ -1291,6 +1308,17 @@ rlang::is_list(y)
 #| echo: false
 
 ``` 
+
+`lobstr::tree( )` shows the structure of `x` and of `y`.
+
+```{r}
+### Question
+#| label: enigma-list-2
+#| eval: true
+lobstr::tree(x)
+lobstr::tree(y)
+```
+
 :::
 
 ::: {.callout-note}
@@ -1309,6 +1337,7 @@ rlang::is_list(y)
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: list-1
 #| eval: true
 #| collapse: false
 nl <- list(p=p, q=q, x=x)
@@ -1320,6 +1349,7 @@ the string on the left-hand side to the object on the right-hand side.
 List elements can be extracted in defferent ways.  
 
 ```{r}
+#| label: list-2
 #| eval: true
 #| collapse: false
 names(nl)
@@ -1343,7 +1373,7 @@ nl[[2]]
 Read and understand the next expressions.
 
 ```{r}
-#| label: enigma-list-2 
+#| label: enigma-list-3
 #| eval: false
 #| collapse: false
 is_atomic(p);  is_atomic(p[2]) ; is_atomic(p[[2]])
@@ -1389,10 +1419,11 @@ Inspection of object addresses shows that when building `x` from objects `p` and
 Note that `x[[2]]` and `x[2]` are different objects, the former is one element list, the second is an atomic vector.
 
 ```{r}
+#| label: unveiling-structure
 #| eval: true
 #| collapse: false
-ref(x[2])
-obj_addr(x[[2]])
+lobstr::ref(x[2])
+lobstr::obj_addr(x[[2]])
 ```
 
 :::::
@@ -1411,7 +1442,16 @@ How would you replace `"A"` in `x` with `"K"`?
 
 ::::: {.callout title="Solution" collapse="false"}
 
+
 ```{r}
+#| label: replace
+#| eval: true
+x[[2]][1] <- "K"
+x
+lobstr::ref(x)
+```
+```{r}
+#| label: replace-2
 #| eval: true
 #| collapse: false
 w <- c(2, 7, 8)
@@ -1439,12 +1479,13 @@ using named vectors. If we want to map: `"seine"` to `"75"`, `"loire"` to `"42"`
 `"rhone"` to `"69"`, `"savoie"` to `"73"` we can proceed in the following way:
 
 ```{r}
+#| label: lookup-table
 #| eval: true
 #| collapse: false
 codes <- c(75L, 42L, 69L, 73L)
-names(codes) <- c("seine", "loire", "rhone", "savoie")
+names(codes) <- c("seine", "loire", "rhône", "savoie")
 
-codes["rhone"];  codes["aube"]
+codes["rhône"];  codes["aube"]
 ```
 
 ::: {.callout-note}
@@ -1460,6 +1501,7 @@ What is the class of `codes` ?
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: classy-lookup-table
 #| eval: true
 #| collapse: false
 names(codes)
@@ -1480,7 +1522,9 @@ Capitalize the `names` used by `codes`
 :::
 
 ::: {.callout-tip}
+
 Package `stringr` offers a function `str_to_title()` that could be of interest.
+
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -1488,6 +1532,7 @@ Package `stringr` offers a function `str_to_title()` that could be of interest.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: capitalize
 #| eval: true
 #| collapse: false
 names(codes) <- stringr::str_to_title(names(codes))
@@ -1508,6 +1553,7 @@ Factors exist in Base `R`. They play a very important role. Qualitative/Categori
 Meta-package `tidyverse` offers a package dedicated to `factor` engineering: `forcats`.
 
 ```{r}
+#| label: factors-0
 #| eval: true
 #| collapse: false
 yraw <- c("g1","g1","g2","g2","g2","g3")
@@ -1532,6 +1578,7 @@ How does it change the behavior of _generic_ function `summary` ?
 ### Solution
 
 ```{r}
+#| label: factors-1
 #| eval: true
 #| collapse: false
 fyraw <- as.factor(yraw)
@@ -1547,6 +1594,7 @@ summary(fyraw)
 Load  the (celebrated) `iris` dataset, and inspect variable `Species`
 
 ```{r}
+#| label: factors-iris
 #| eval: true
 data(iris)
 
@@ -1575,6 +1623,7 @@ We may want to collapse `virginica`  and `versicolor` into a single level called
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: factors-iris-collapse
 col_species <- forcats::fct_collapse(
   species,
   versinica = c("versicolor", "virginica")
@@ -1635,6 +1684,7 @@ y <- whiteside$Insul          # picking a factor column
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: factors-whiteside
 is.factor(y) ; is.vector(y) ; is.ordered(y)
 class(y)
 
@@ -1663,17 +1713,18 @@ Summarize factor `y`
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: factors-whiteside-summary
 summary(y)   # counts
 
 table(y)     # one-way contingency table
 
 table(y)/sum(table(y))*100   # one-way contingency table as percentages
 
-table(y) %>%
+table(y) |>
   knitr::kable(col.names = c("Insulation", "Frequency"), 
                caption = "Whiteside data")  # Pb encoding sur machine windows
 
-forcats::fct_count(y) %>%
+forcats::fct_count(y) |>
   knitr::kable(col.names = c("Insulation", "Frequency"), 
                caption = "Whiteside data")
 ```
@@ -1691,14 +1742,14 @@ use `forcats::as_factor()` rather than base `R` `as.factor()`.
 
 {{< fa hand-point-right >}} Useful function to make nice `barplots` when constructing `barplots`. 
 
-Recall  that when you want to display counts for a univariate _categorical_ sample, you use a `barplot`.  It is often
-desirable to rank the levels according to the displayed statistics (usually a count).
+Recall  that when you want to display counts for a univariate _categorical_ sample, you use a `barplot`.  It is often desirable to rank the levels according to the displayed statistics (usually a count).
 
 This can be done in a seamless way using functions like `forcats::fct_infreq()`.
 
 :::
 
 ```{r}
+#| label: factors-whiteside-barplot
 #| eval: true
 forcats::fct_count(y, prop = TRUE)
 
@@ -1723,8 +1774,11 @@ Make `z` ordered with level `After` preceding `Before`. Does ordering impact the
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: factors-whiteside-ordered
+#| eval: true
 forcats::fct_count(z)
 forcats::fct_count(factor(z, ordered=TRUE, levels=c("After", "Before")))
+forcats::fct_count(forcats::fct_infreq(z))
 ```
 
 :::::
@@ -1736,16 +1790,20 @@ forcats::fct_count(factor(z, ordered=TRUE, levels=c("After", "Before")))
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: plot-factors-whiteside-ordered
 #| eval: true
 #| collapse: false
 #| 
-whiteside %>%
+whiteside |>
   ggplot2::ggplot() + 
   ggplot2::aes(x=forcats::fct_infreq(Insul), fill=Insul) +
   ggplot2::geom_bar() +
   ggplot2::xlab("After and Before Insulation") +
   ggplot2::theme_minimal() +
-  ggplot2::theme(legend.position="None")
+  ggplot2::theme(legend.position="None") +
+  labs(title="Whiteside data",
+    subtitle="Insulation frequency: showcasing fct_infreq()", 
+    caption="Source: MASS::whiteside")
 ```
 
 :::::
@@ -1776,17 +1834,19 @@ Any software geared at data science supports some kind of dataframe
 The `iris` dataset is the "Hello world!" of dataframes.
 
 ```{r}
+#| label: iris
 #| eval: true
 #| collapse: false
 data(iris)
 
-iris %>%
+iris |>
   glimpse()
 ```
 
 A `matrix` can be transformed into a `data.frame`
 
 ```{r}
+#| label: matrix-df
 #| eval: true
 #| collapse: false
 A <- matrix(rnorm(10), ncol=2)
@@ -1797,14 +1857,19 @@ There are several flavors of dataframes in `R`:
 `tibble` and `data.table` are modern variants of `data.frame`.
 
 ```{r}
+#| label: tibble
 #| eval: true
 #| collapse: false
-t <- tibble::tibble(x=1:3, a=letters[11:13], d=Sys.Date() + 1:3)
+t <- tibble::tibble(
+  x=1:3, 
+  a=letters[11:13], 
+  d=Sys.Date() + 1:3)
 
 head(t)
 ```
 
 ```{r}
+#| label: data.table
 #| eval: true
 #| collapse: false
 glimpse(t)
@@ -1836,6 +1901,7 @@ Function `sample()` from base `R` is very convenient
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: permute-slice-columns
 #| eval: true
 #| collapse: false
 t[sample(names(t))]
@@ -1894,7 +1960,7 @@ __Hint:__ use `class(), is.data.frame() tibble::is_tibble()`
 
 #| label: flight_glimpse
 #| eval: true
-data %>% glimpse()
+data |> glimpse()
 
 class(data)
 is.data.frame(data)
@@ -1918,12 +1984,13 @@ Extract the name and the type of each column.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_colnames
 #| eval: true
 #| collapse: false
 colnames(data)              # name of columns 
 sapply(data, class)         # old school R, a dataframe is a list
 lapply(data, class)         # old school R, a dataframe is a list
-map(data, class)            # tidyverse way
+purrr::map(data, class)            # tidyverse way
 ```
 
 :::::
@@ -1961,20 +2028,21 @@ Use `across()` from `dplyr` 1.x.  See [Documentation](https://dplyr.tidyverse.or
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_mean
 #| eval: true
 #| collapse: false
-data %>%
-  dplyr::select(where(is.numeric)) %>%  # projecting on numerical columns
+data |>
+  dplyr::select(where(is.numeric)) |>  # projecting on numerical columns
   purrr::map(mean)                      # applying the treatment to each column
 
-data %>%
-  dplyr::select(where(is.numeric)) %>%  # projecting on numerical columns
+data |>
+  dplyr::select(where(is.numeric)) |>  # projecting on numerical columns
   dplyr::summarise(across(everything(), mean, na.rm=T))
 
-data %>%
+data |>
   dplyr::summarise(across(where(is.numeric), mean))
 
-data %>%
+data |>
   dplyr::summarise(across(.cols=where(is.numeric), .fns=mean, na.rm=T))
 ```
 
@@ -1987,7 +2055,7 @@ The output of `summary` is a shortened version the list of outputs obtained from
 
 ```{r}
 #| eval: true
-data %>%
+data |>
   summary()
 ```
 
@@ -1996,6 +2064,7 @@ data %>%
 We add now a few `NA`s to the data....
 
 ```{r}
+#| label: flight_NA
 #| eval: true
 data2 <- data
 data2$arr_time[1:10] <- NA
@@ -2020,9 +2089,10 @@ How should we compute the column means now?
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_NA_mean
 #| eval: true
 #| collapse: false
-data2 %>%
+data2 |>
   dplyr::summarise(across(is.numeric, mean))
 ```
 
@@ -2031,7 +2101,7 @@ data2 %>%
 :::
 
 
-It is time to look at optional arguments of function `mean`.
+It is time to look at *optional* arguments of function `mean`.
 
 ::: {.callout-note}
 
@@ -2046,9 +2116,10 @@ Decide to ignore `NA` and to compute the mean with the available data
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_NA_mean_options
 #| eval: true
 #| collapse: false
-data2 %>%
+data2 |>
   dplyr::summarise(across(is.numeric, mean, na.rm=TRUE))
 ```
 
@@ -2071,10 +2142,12 @@ Show this leads to a different result.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_NA_drop
 #| eval: true 
-data2 %>% 
-  drop_na() %>% 
-  dplyr::summarise(across(is.numeric, mean, na.rm=FALSE))
+data2 |> 
+  drop_na() |> 
+  dplyr::summarise(across(where(is.numeric), mean, na.rm=FALSE)) |>
+  knitr::kable()
 ```
 
 :::::
@@ -2093,17 +2166,20 @@ Compute the minimum, the median, the mean and the maximum of numerical columns
 
 ::::: {.callout title="Solution" collapse="false"}
 ```{r}
+#| label: flight_NA_summary
 #| eval: true
 #| collapse: false
-data2 %>%
-  dplyr::select_if(is.numeric) %>%
+data2 |>
+  dplyr::select_if(is.numeric) |>
   lapply(function(x) c(med=median(x, na.rm=TRUE),
                        avg=mean(x, na.rm=TRUE),
                        max=max(x, na.rm=TRUE))
          )
 
-  data2 %>%
-  dplyr::summarise(across(is.numeric, c(median=median,mean=mean, max=max), na.rm=T))  
+  data2 |>
+  dplyr::summarise(across(where(is.numeric), 
+                          c(median=median,mean=mean, max=max), 
+                          na.rm=T))  
 ```
 
 :::::
@@ -2125,13 +2201,19 @@ Check with [https://dplyr.tidyverse.org/reference/scoped.html?q=funs#arguments](
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: nicer-output-gt
 #| eval: true
-data2 %>%
-  dplyr::summarise(across(is.numeric,
+data2 |>
+  dplyr::summarise(across(where(is.numeric),
                           list(median=median,
                                mean=mean,
-                               max=max) ,
-                          na.rm=TRUE))
+                               max=max),
+                          na.rm=TRUE)
+  ) |>
+  tidyr::pivot_longer(cols=everything(), names_to="stat", values_to="value") |>
+  head() |> 
+  gt::gt() |>
+  gt::fmt_number(columns="value", decimals=2)
 
 ```
 :::::
@@ -2152,10 +2234,11 @@ Mimic `summary` on numeric columns
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_NA_summary-2
 #| eval: true
 #| collapse: false
 #| 
-mysum <- data2 %>%
+mysum <- data2 |>
   dplyr::summarise(across(is.numeric,
                           list(median=median,
                                mean=mean,
@@ -2164,7 +2247,19 @@ mysum <- data2 %>%
                                sd=sd,
                                IQR=IQR) ,
                       na.rm=TRUE))
-mysum
+```
+
+```{r}
+#| label: flight_NA_summary-3
+mysum |>
+  tidyr::pivot_longer(
+    cols=everything(), 
+    names_pattern = "(\\w+)_([a-z]+)",
+    names_to= c("variable", "stat"), 
+    values_to="value") |>
+  head(20) |>
+  gt::gt() |>
+  gt::fmt_number(columns="value", decimals=2)
 ```
 
 :::::
@@ -2187,11 +2282,12 @@ Have a look at Section [Operate on a selection of variables](https://dplyr.tidyv
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_itinerary
 #| eval: true
 #| collapse: false
 #| 
-data %>%
-  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) %>%
+data |>
+  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) |>
   dplyr::select(itinerary, dest, origin, everything())
 ```
 
@@ -2212,13 +2308,14 @@ Compute the coefficient of variation (ratio between the standard deviation and t
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_coef_var
 #| eval: true
 #| collapse: false
-data %>%
-  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) %>%
-  dplyr::select(itinerary, dest, origin, everything()) %>% 
-  dplyr::group_by(itinerary) %>% 
-  dplyr::summarise(coef_var=sd(air_time, na.rm=T)/mean(air_time, na.rm=T), .groups = "drop") %>% 
+data |>
+  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) |>
+  dplyr::select(itinerary, dest, origin, everything()) |> 
+  dplyr::group_by(itinerary) |> 
+  dplyr::summarise(coef_var=sd(air_time, na.rm=T)/mean(air_time, na.rm=T), .groups = "drop") |> 
   slice_sample(n=10)
 ```
 
@@ -2240,15 +2337,16 @@ Compute for each flight the ratio between the `distance` and the `air_time` in  
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: flight_ratio
 #| eval: true
 #| collapse: false
 #| 
 before <- Sys.time()
 
-data %>%
-  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) %>%
-  dplyr::group_by(itinerary) %>%
-  dplyr::summarize(ratio=mean(air_time)/max(distance)) %>%
+data |>
+  dplyr::mutate(itinerary=paste(dest, origin, sep="-")) |>
+  dplyr::group_by(itinerary) |>
+  dplyr::summarize(ratio=mean(air_time)/max(distance)) |>
   dplyr::arrange(desc(ratio))
 
 required_time <- Sys.time() - before
@@ -2271,14 +2369,15 @@ Which carrier suffers the most delay?
 
 ::::: {.callout title="Solution" collapse="false"}
 ```{r}
+#| label: flight_delay
 #| eval: true
 #| collapse: false
-data %>%
-  dplyr::select(carrier, arr_delay) %>%
-  dplyr::filter(arr_delay > 0) %>%
-  dplyr::group_by(carrier) %>%
-  dplyr::summarise(ndelays= n()) %>%
-#  dplyr::arrange(desc(ndelays)) %>%
+data |>
+  dplyr::select(carrier, arr_delay) |>
+  dplyr::filter(arr_delay > 0) |>
+  dplyr::group_by(carrier) |>
+  dplyr::summarise(ndelays= n()) |>
+#  dplyr::arrange(desc(ndelays)) |>
 #  head(3)
   dplyr::top_n(3, ndelays)
 ```
@@ -2291,28 +2390,29 @@ data %>%
 ### Puzzle
 
 ```{r}
+#| label: flight_puzzle
 #| eval: true
 #| collapse: false
 year <- 2012L
 
-data %>%
-  dplyr::select(year, dest, origin) %>%
+data |>
+  dplyr::select(year, dest, origin) |>
   head()
 
-data %>%
-  dplyr::filter(year==year) %>%
+data |>
+  dplyr::filter(year==year) |>
   dplyr::summarize(n())
 
-data %>%
-  dplyr::filter(year==2012L) %>%
+data |>
+  dplyr::filter(year==2012L) |>
   dplyr::summarize(n())
 
-data %>%
-  dplyr::filter(year==.env$year) %>%
+data |>
+  dplyr::filter(year==.env$year) |>
   dplyr::summarize(n()) 
 
-data %>%
-  dplyr::filter(year==.data$year) %>%
+data |>
+  dplyr::filter(year==.data$year) |>
   dplyr::summarize(n()) 
 ```
 
@@ -2353,6 +2453,7 @@ sense to use the `if (...) {...} else {...}` construct
 There is also a conditional statement with an optional `else {}`
 
 ```{.r}
+#| label: if-else
 #| eval: false
 #| collapse: false
 if (condition) {
@@ -2378,6 +2479,7 @@ Nope!
 {{< fa hand-point-right >}} `R` also offers a `switch`
 
 ```{.r}
+#| label: switch
 switch (object,
   case1 = {action1}, 
   case2 = {action2}, 
@@ -2390,6 +2492,7 @@ switch (object,
 There exists a selection function `ifelse(test, yes_expr, no_expr)`.
 
 ```{r}
+#| label: ifelse
 #| eval: false
 ifelse(test, yes, no)
 ```
@@ -2397,6 +2500,7 @@ ifelse(test, yes, no)
 Note that `ifelse(...)` is vectorized.
 
 ```{r}
+#| label: ifelse-2
 #| eval: true
 #| collapse: false
 x <-  1L:6L
@@ -2470,6 +2574,12 @@ v[1:10]
 
 pmin <- 1
 
+# q: what is the purpose of the following loop?
+# for (i in 2:length(v)) {
+#   if (v[i]<v[pmin]) {
+#     pmin <- i
+#   }
+# }
 for (i in seq_along(v)) {
   if (v[i]<v[pmin]) {
     pmin <- i
@@ -2500,12 +2610,15 @@ Find the location of the minimum in a vector `v`
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: find-min
 #| eval: true
 #| collapse: false
 v <- sample(100, 100)
 
 pmin <- 1   # Minimum in v[1:1]
 i <- 2
+
+# q: find le location of the minimum in  vector v
 
 while (i <= length(v)) {
   # loop invariant: v[pmin] == min(v[1:i])
@@ -2537,9 +2650,9 @@ Write a loop that checks whether vector `v` is non-decreasing.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: is_non_decreasing
 #| eval: true
 #| collapse: false
-#| label: is_non_decreasing
 #| 
 result <- TRUE
 
@@ -2586,6 +2699,7 @@ Write a function that checks whether vector `v` is non-decreasing.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: function_test_is_non_decreasing
 #| eval: true
 #| collapse: false
 is_non_decreasing <- function(v) {
@@ -2632,6 +2746,9 @@ Write a function with integer parameter $n$, that returns the Pascal Triangle wi
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: pascal_triangle
+#| eval: true
+#| collapse: false
 triangle_pascal <- function(n) {
   m <- n+1
   T <- matrix(c(rep(1, m), rep(0, m*(m-1))), nrow=m, ncol=m)
@@ -2655,6 +2772,7 @@ print(triangle_pascal(10), na.print=" " )
 Sanity check: `R` provides us with function `choose`
 
 ```{r}
+#| label: sanity-check-pascal
 #| eval: true
 #| collapse: false
 n <- 5
@@ -2687,6 +2805,8 @@ $$F_{n+2} = F_{n+1} + F_n \qquad F_1= F_2 = 1$$
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: fibonacci
+#| eval: true
 fibo <- function(n) {
   res <- integer(n)
   res[1:2] <- 1
@@ -2714,9 +2834,43 @@ Write a function that perform binary search in a non-decreasing vector.
 
 ::::: {.callout title="Solution" collapse="false"}
 
-      
+```{r}
+#| label: binary_search
+#| eval: true
+#| collapse: false
 
+binary_search <- function(v, x) {
+  n <- length(v)
+  i <- 1
+  j <- n
+  while (i <= j) {
+    k <- (i+j) %/% 2
+    if (v[k] == x) {
+      return(k)
+    } else if (v[k] < x) {
+      i <- k + 1
+    } else {
+      j <- k - 1
+    }
+  }
+  return(NA)
+}
 
+```      
+
+> The provided code defines a function binary_search in R, which implements the binary search algorithm to find the position of a target value x within a sorted vector v. The binary search algorithm is efficient, operating in O(log n) time complexity, making it suitable for large datasets.
+>
+> The function begins by determining the length of the vector v and storing it in the variable n. It then initializes two variables, i and j, to represent the lower and upper bounds of the search range, respectively. Initially, i is set to 1 (the first index of the vector), and j is set to n (the last index of the vector).
+
+> The core of the function is a while loop that continues as long as i is less than or equal to j. Within
+the loop, the midpoint k of the current search range is calculated using integer division (%/%) to ensure it is an integer. The value at index k in the vector v is then compared to the target value x.
+
+> If the value at v[k] is equal to x, the function returns k, indicating that the target value has been found at this position. If v[k] is less than x, the search range is adjusted by setting i to k + 1, effectively discarding the lower half of the current range. Conversely, if v[k] is greater than x, the search range is adjusted by setting j to k - 1, discarding the upper half of the current range.
+
+> If the loop completes without finding the target value, the function returns NA, indicating that the target value x is not present in the vector v. This implementation assumes that the input vector v is sorted in ascending order.
+
+{{< fa hand-point-right >}} Code and explanation provided by [https://www.techiedelight.com/binary-search-in-r/](https://www.techiedelight.com/binary-search-in-r/)
+through copilot
 
 :::::
 
@@ -2748,6 +2902,7 @@ Try to use [https://purrr.tidyverse.org](https://purrr.tidyverse.org).
 \(x) body
 ```
 is a shorthand for
+
 ```{.r}
 function (x) {
   body
@@ -2774,6 +2929,7 @@ Write truth tables for `&, |, &&, ||, !` and `xor`
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: truth-table
 #| eval: true
 #| collapse: false
 #| 
@@ -2804,11 +2960,12 @@ and returns `TRUE` if it is lower triangular.
 ::::: {.callout title="Solution" collapse="false"}
 
 ```{r}
+#| label: lower-triangular
 #| eval: true
 #| collapse: false 
 lt <- function(A){
   n <- nrow(A)
-  all(purrr::map_lgl(1:(n-1), \(x) all(0== A[x, (.+1):n])))
+  all(purrr::map_lgl(1:(n-1), \(x) all(0 == A[x, (x+1):n])))
 }
 ```
 

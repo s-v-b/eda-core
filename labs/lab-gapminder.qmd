@@ -98,6 +98,7 @@ stopifnot(
   require(gapminder),
   require(ggrepel)
 )
+
 ```
 
 The data we will use can be obtained by loading package `gapminder`

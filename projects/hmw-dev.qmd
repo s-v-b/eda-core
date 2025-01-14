@@ -1,0 +1,106 @@
+---
+title: "Package Development"
+engine: knitr
+date: "`r Sys.time()`"
+
+execute:
+  echo: true
+  eval: false
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-dev-2025.html
+  pdf:
+    output-file: hmw-dev-2025.pdf
+
+draft: true
+standalone: true
+prefer-html: true
+---
+
+
+
+
+
+### {{< fa map >}} Objectives
+
+
+This homework is concerned with developping methods 
+for objects produced by factorial methods like Correspondence Analysis, Multiple Correspondence Analysis, Canonical Correlation Analysis, ...  (`R`). 
+
+```{r useful-pkg, include=FALSE}
+#| message: FALSE
+#| warning: FALSE
+#| eval: true
+
+stopifnot(
+  require(tidyverse),
+  require(glue),
+  require(patchwork),
+  require(DT),
+  require(ggforce)
+)
+```
+
+### Supplementing the `broom` package
+
+The `broom` package offers `S3` generic functions for 
+building dataframes from the output of a variety of statistical techniques (for example `lm`, `prcomp`, or `kmeans`): `augment`, `tidy`, and `glance`.
+
+The first goal of this homework is to  design and code methods for generic functions `augment`, `tidy`, and `glance` for classes `CA`, `MCA`, `CCA`.
+
+You may use classes `CA`, `MCA`, and `CCA` from `FactoMineR` or design your own classes. 
+
+### Programming with `dplyr` and `ggplot2`
+
+The second goal of this homework is to design and code functions that take as input the output of `augment`, `tidy`, and `glance`  (possibly simultaneously) to build `ggplot` objects corresponding to the plots associated with  `CA`, `MCA`, and `CCA` (screeplot, row plot, column plot, and symmetric plot).
+
+::: {.callout-note}
+
+`ggplot2` offers a generic function `autoplot()`. See [Tidyverse documentation on `autoplot`](https://ggplot2.tidyverse.org/reference/autoplot.html), More generally 
+have a look at [automatic plotting](https://ggplot2.tidyverse.org/reference/automatic_plotting.html)
+
+:::
+
+The third goal of this homework is to design and code methods for generic function `autoplot()` for classes `CA`, `MCA`, `CCA`.
+
+::: {.callout-tip}
+
+Have a look at `autolayer()` generic. Could be useful for implementing symmetric plots (biplots). 
+
+:::
+
+
+
+### Package development
+
+The function and methods coded in this homework should be delivered as a `package`.
+
+Follow the package devlopment guidelines in [R Packages (2e)](https://r-pkgs.org).
+
+- Define a dedicated rstudio project for this homework
+- Don't forget documentation and testing
+  
+
+
+### References
+
+- [Advanced R Programming](https://adv-r.hadley.nz)
+- [S3](https://adv-r.hadley.nz/s3.html)
+- [Programming with/for `ggplot2`](https://ggplot2-book.org)
+- [Cheatsheets](https://posit.co/resources/cheatsheets/)
+- [Packages](https://r-pkgs.org)
+
+
+
+
+### {{<  fa graduation-cap >}} Grading criteria 
+
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+| Documentation| `r scales::label_percent()(5/20)` | English/French {{<  fa pen-fancy >}}|
+| Testing  | `r scales::label_percent()(5/20)` |  {{<  fa check >}}|
+| Coding   | `r scales::label_percent()(10/20)` |    {{<  fa code >}} |
+

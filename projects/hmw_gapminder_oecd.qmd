@@ -1,0 +1,117 @@
+---
+title: "Hmw I : Tables and visualization"
+date: "2025-01-13"
+
+engine: knitr
+---
+
+::: {.callout-important}
+
+- Due : February 7, 2025
+- Work in pairs
+- Deliver your work as a `qmd` file through a github {{< fa brands github >}} repository
+- Use the `quarto` package for reproducible research
+- The report should be rendered at least in HTML format, and possibly also in PDF format
+
+:::
+
+### {{< fa map >}} Objectives
+
+This homework is dedicated to table wrangling and visualization.
+
+[OECD](https://data.oecd.org) offers detailed statistics at different territorial levels.
+
+Using data gathered from [OECD](https://data.oecd.org), build  dataframes with a gapminder-like schema (territorial units/timestamps as  keys, statistics for other columns). Using `ggplot2` and `plotly`, design plots and  animations like the \[Rossling address to BBC\]().
+
+Your data and graphical pipelines should be designed so that they can be at least partially reused to perform gapminder-like animations with other kind of data gathered from OECD. For example one, could replace life expectancy at birth by life expectancy at 60, infant mortality, or any other health index. One could replace GDP per capita with social expenditure per capita, or something like that.
+
+Your deliverable shall consist in a `qmd` file that can be rendered in HTML format.
+
+You shall describe the downloaded data.
+
+Plots shall be endowed with titles, legends and captions,
+
+Data pipelines and graphical pipelines shall be given in an appendix.
+
+### {{< fa database >}} Data
+
+Data have to be downloaded from <https://data.oecd.org> (the old site <https://stats.oecd.org> which could be drilled using package `OECD` is shutting down).
+
+::: {.columns}
+::: {.column width="60%"}
+
+Use [OECD Data explorer](https://www.oecd.org/en/data/datasets/oecd-DE.html) to find the data you need.
+Follow the guidleines given in the [OECD Data Explorer API](https://data.oecd.org/api/sdmx-json-documentation/).
+
+{{< video "https://www.youtube.com/watch?v=AizMXcgvbvQ&t=10s" >}}
+
+:::
+
+::: {.column width="5%"}
+
+:::
+
+::: {.column width="35%"}
+
+Once you have decided which data you need, you shall build an extraction pipeline using `httr` and `rvest` to download the data or tools from [`OECD` package](https://github.com/expersso/OECD). 
+
+{{< fa hand-point-right >}} Table wrangling should be performed using `tidyverse` tools.
+
+{{< fa hand-point-right >}} Your extraction pipeline shall be reproducible and shall be given in an appendix.
+
+:::
+:::
+
+
+
+
+{{< fa hand-point-right >}} Keep the downloaded data in a separate subdirectory. Your working directory (working tree) should look like something like that:
+
+```{verbatim}
+.
+├── .git/
+├── DATA/
+│   ├── OECD.foo.csv
+│   ├── OECD.foobar.csv
+│   ├── OECD.bar.csv
+|   :
+├── _extensions/
+├── _outdir/
+├── _metadata.yml
+├── _quarto.yml
+├── my_report.qmd
+├── :
+└── README.md
+```
+
+
+
+
+## {{< fa chart-bar >}} Report organization
+
+The first part  (introduction) of the report shall be dedicated to the description of the data you have downloaded. You shall motivate your choice and non-trivial aspects  of the data (for example if you were discussing GDP per capita against Life expectancy, you should remind the reader about the definition of Life expectancy and GDP). You shall also give a hint about why you intend to plot some variables against others.
+
+The second part (results) shall be dedicated to plots and animations. Commenting a plot is not paraphrasing. It consists in adding informations and explanations that are not already in and around the plot (this includes the plot itself, title, subtitle, caption, and guides). It also consists in questions and issues that the plot raises. For example, in the Gapminder presentation, the apparent connection between life expectancy and GDP per capita deserves to be discussed (is it stationary? is it homogeneous throughout continents ? ...). Refrain from overplaying your hand: yours plots are not likely to provide causal explanations. Comment the data, all the data, and nothing but the data.
+
+The third part is the appendix. The first two parts should be text and plots only. The third part should be code only.
+
+The appendix shall be dedicated to the description of the data wrangling pipeline. You shall give the code. 
+
+You shall also give the code of the graphical pipelines in the appendix.
+
+You shall avoid copy-paste coding. Don't Repeat Yourself. The `tidyverse` is your friend. `knitr` provide the tools to organize the Quarto file so that you can write your code once and use it many times, once for data wrangling and plotting (without echoing), then for listing and explanation.
+
+
+## {{< fa graduation-cap >}} Grading criteria
+
+
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+|Narrative, spelling and syntax | `r scales::label_percent()(5/20)` | English/French {{<  fa pen-fancy >}}|
+|Plots correction | `r scales::label_percent()(4/20)` | choice of `aesthetics`, `geom`, `scale` ... {{<  fa chart-area >}}|
+|Plot style | `r scales::label_percent()(3/20)` | Titles, legends, labels, breaks ... {{<  fa chart-area >}} |
+|Table wrangling | `r scales::label_percent()(3/20)` | ETL, SQL like manipulations {{<  fa database >}} |
+|Computing Statistics | `r scales::label_percent()(1/20)` | Aggregations, LR, PCA, CA, ... {{<  fa chart-area >}} |
+|DRY compliance | `r scales::label_percent()(4/20)` | DRY principle at {{<  fa brands  wikipedia-w  >}} [ Wikipedia ](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)|
+

@@ -1,0 +1,23 @@
+---
+title: "Hmw template"
+format: html
+editor: visual
+params:
+  author1: "Name1 FirstName1"
+  author2: "Name2 FirstName2"
+  date: "2024-01-01"
+  course: "EDA"
+
+execute:
+  eval: true
+
+engine: knitr
+---
+
+### {{< fa map-location-dot >}} Objectives
+
+### {{< fa database >}} Data
+
+## {{< fa graduation-cap >}} Grading criteria
+
+{{< include evaluation_guidelines.qmd >}}

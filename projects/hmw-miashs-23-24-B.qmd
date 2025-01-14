@@ -1,0 +1,487 @@
+---
+title: "Life Tables"
+date: "`r Sys.time()`"
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-miashs-23-24-b.html
+  pdf:
+    output-file: hmw-miashs-23-24-b.pdf
+
+
+
+draft: true
+engine: knitr
+---
+
+
+```{r}
+#| include: false
+#| message: false
+#| warning: false
+
+stopifnot(
+  require(here),
+  require(patchwork),
+  require(glue),
+  require(tidyverse)
+)
+
+old_theme <- theme_set(theme_minimal())
+```
+
+
+
+
+
+
+# Devoir II : Etude de tables de mortalite
+
+
+::: {.callout-important}
+
+### Attendu
+
+Un fichier `nom1_nom2.Rmd` ou `nom1_nom2.qmd` au format `Rmarkdown` (`.Rmd`) ou `Quarto` (`.qmd`), compilable (mais pas compilé) en format `html`, à charger sur [Moodle](https://moodle.u-paris.fr/course/view.php?id=13227).
+
+Dans ce fichier `nom1_nom2.xxx`, on trouvera le code nécessaire à la génération des graphiques et des tables correspondants aux questions ci-dessous. 
+
+Date de rendu : 29 mai 2024 à 23h59
+
+À réaliser en binôme. 
+
+:::
+
+## Tables de mortalité  (1900-1925)
+
+
+Ce devoir porte sur les tables de mortalité (*life tables*) américaines et européennes entre 1900 et 1925.
+
+Les tables ont été obtenues de [https://www.mortality.org](https://www.mortality.org). 
+
+Nous étudions les  tables de mortalité de quelques pays d'Europe occidentale  (France, Grande-Bretagne --en fait, Angleterre et Pays de Galles--, Italie, Pays-Bas, Espagne, et  Suède) et des États-Unis d'Amérique. 
+
+
+Les tables peuvent être téléchargées à l'aide des instructions suivantes :
+
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+#| eval: false
+
+datafile <- 'full_life_table.Rds'
+fpath <- stringr::str_c("./DATA/", datafile) 
+
+# here::here('DATA', datafile)   
+# check getwd() if problem 
+
+if (! file.exists(fpath)) {
+  download.file("https://stephane-v-boucheron.fr/data/full_life_table.Rds", 
+                fpath,
+                mode="wb")
+}
+
+life_table <- readr::read_rds(fpath)
+```
+
+```{r}
+#| eval: false
+life_table <- life_table %>%
+  mutate(Country = as_factor(Country)) %>%
+  mutate(Country = fct_relevel(Country, "Spain", "Italy", "France", 
+  "England & Wales", "Netherlands", "Sweden", "USA")) %>%
+  mutate(Gender = as_factor(Gender)) 
+
+life_table <- life_table %>%
+  mutate(Area = fct_collapse(Country, 
+                        SE = c("Spain", "Italy", "France"), 
+                        NE = c("England & Wales", "Netherlands", "Sweden"), 
+                        USA="USA")) 
+```
+
+Sur les données françaises, le document [Tables de mortalité françaises pour les XIXe et XXe siècles et projections pour le XXIe siècle](https://www.lifetable.de/data/FRA/FRA000018061997CY1.pdf) contient des informations utiles sur la  construction des tables de mortalité.
+
+
+
+### Notation (Rappel)
+
+Dans la suite $F$ désigne une fonction de répartition sur $\mathbb{N} = \mathbb{Z}_+$, et $\overline{F}=1 - F$ la fonction de survie associée. Cette fonction $F$ est définie à partir des quotients de mortalité (voir plus bas). Elle ne décrit pas la pyramide des âges. On définit une fonction pour chaque année $t$. Pour chaque année, pays, sexe, $F_t(x)$ est la proportion des membres d'une cohorte (fictive) qui vivent au moins jusqu'à l'âge $x$ dans l'année $t$. 
+
+`qx`
+: (age-specific) risque de décès à l'age (révolu) $x$, ou encore  *quotient de mortalité* à l'age  $x$ pour l'année $t$:
+$q_{t,x} = \frac{\overline{F}_t(x) - \overline{F}_t(x+1)}{\overline{F}_t(x)}$.  
+Pour chaque année, chaque âge, $q_{t,x}$ est  déterminé par les données de l'année.
+
+Nous avons aussi  $$\overline{F}_{t}(x+1) = \overline{F}_{t}(x) \times (1-q_{t,x+1})\, .$$
+
+`mx`
+: *taux  central de  décès* à l'âge (révolu)  $x$  durant l'année $t$. C'est relié à  $q_{t,x}$ par 
+$$m_{t,x} = -\log(1- q_{t,x}) \,,$$ 
+ou  de manière équivalente $q_{t,x} = 1 - \exp(-m_{t,x})$. 
+
+
+`lx`
+: la *fonction de survie*: un multiple de  proportion  de  personnes encore vivantes à l'âge $x$. Ces valeurs sont calculées à  partir de $q_{t,x}$  via la formule 
+$$l_t(x+1) = l_t(x) \times (1-q_{t,x}) \, ,$$
+avec  $l_{t,0}$, la racine (*radix*) de la  table, en fait, choisi égal à $100000$.
+Les fonctions  $l_{t,\cdot}$ et $\overline{F}_t$ sont liées par 
+$$l_{t,x + 1} = l_{t,0} \times \overline{F}_t(x)\,.$$
+
+
+
+`dx`
+: $d_{t,x} = q_{t,x} \times l_{t,x}$
+
+`Tx`
+: Nombre total de  personnes-années  vécues  par la cohorte des gens d'âge compris entre $x$ et $x+1$ (pour une année donnée dans une société donnée). C'est nombre d'années vécues par les  $l_{t, x+1}$ personnes qui  survivent à l'intervalle de temps, et les  $d_{t,x}$ personnes qui décèdent durant cette intervalle (ici l'intervalle est une année). Les premiers contribuent chacun exactement  $1$ année, alors que ces derniers  contribuent, en moyenne, approximativement pour une demi-année. Ainsi  $L_{t,x} = l_{t,x+1} + 0.5 \times d_{t,x}$. Cette approximation équivaut à supposer qu'un  décès à l'âge révolu $x$,  intervient en moyenne au milieu de l'année. C'est acceptable excepté durant la première année  (âge 0) et aux grands âges. Nous en restons à l'approximation simpliste $L_{t,x}= l_{t,x+1}$.
+
+`ex`:
+: Espérance de vie *résiduelle* à l'âge $x$ pour l'année $t$. C'est (presque) l'espérance de la loi sur $[0, \infty)$ définie par $F_t$ (et donc par les `qx`), de la façon suivante: si $X \sim F$, c'est 
+
+$$\mathbb{E}_{\{X \geq x\}}\left[X -x \right]= \frac{\mathbb{E}\left[(X-x) \mathbb{I}_{X\geq x}\right]}{\mathbb{E}\left[\mathbb{I}_{X\geq x}\right]}$$ 
+
+
+
+::: {.callout-tip}
+
+Le package `R` nommé `demography` met à disposition un certain nombre d'outils et de concepts élaborés par les démographes.
+
+:::
+
+
+Sources: *Demography: measuring and modeling population processes*. Preston, Heuveline et Guillot.  Blackwell Publishing. 2001.
+
+
+
+::: {.callout-note}
+
+### Question
+
+Pour chaque pays et chaque sexe, illustrer et commenter (brièvement) l'évolution des quotients de mortalité entre 1900 et 1913. 
+
+Remarquer qu'on peut étudier `qx` comme une fonction de l'année $t$,
+mais aussi pour une année donnée, étudier `qx` comme  une fonction de l'âge `x`.   
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+
+Souligner la singularité de l'année 1911
+
+Noter dans les données espagnoles par année, les maxima locaux des quotients de mortalité aux âges 50, 60, 70.
+ 
+```{r}
+#| eval: false
+params = list(
+  truc= "Science des Données",
+  year= 2023 ,
+  curriculum= "L3 MIASHS",
+  university= "Université Paris Cité",
+  homepage= "https://stephane-v-boucheron.fr/courses/scidon",
+  moodle= "https://moodle.u-paris.fr/course/view.php?id=13227",
+  country_code= 'fr_t',
+  country= 'France',
+  datafile= 'full_life_table.Rds',
+  year_p= 1900,
+  year_e= 1925
+)
+```
+
+
+```{r}
+#| eval: false
+dummy_data <- dplyr::filter(life_table, FALSE)
+
+proto_plot <- ggplot(dummy_data,
+                     aes(x=Age,
+                         y=qx,
+                         col=Area,
+                         linetype=Country,
+                         shape=Country)) +
+              scale_y_log10() +
+              scale_x_continuous(breaks = c(seq(0, 100, 10), 109)) +
+              ylab("Mortality quotients") +
+              labs(linetype="Country") +
+              theme_bw()
+```
+
+```{r}
+#| eval: false
+proto_plt2 <-
+  ggplot() +
+  aes(x=Age, y=qx, colour=Area, frame=Year, linetype=Country) +
+  geom_point(size=.1) +
+  geom_line(linewidth=.1) +
+  scale_y_log10() +
+  labs(linetype=c("Country")) +
+  scale_x_continuous(breaks = c(seq(0, 100, 10), 109)) +
+  xlab("Age") +
+  ylab("Central death rates") +
+  facet_grid(cols=vars(Gender))
+```
+
+```{r}
+#| eval: false
+with(params,
+(proto_plt2 %+%
+  (life_table %>% filter(between(Year, year_p, year_e), Gender != 'Both', Age < 90))  +
+  ggtitle("Central death rates 1900-1925"))) %>%
+  plotly::ggplotly()
+```
+
+
+:::
+
+::: {.callout-note}
+
+### Question
+
+Pour chaque pays, chaque sexe, chaque année entre 1900 et 1913, puis entre 1921 et 1925, effectuer une *régression linéaire* du logarithme du quotient de mortalité en fonction de l'âge,  pour les âges compris entre 30 et 70 ans. 
+
+
+Illustrer et commenter.
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+#| eval: false
+df_regs <- life_table |> 
+  filter(between(Year, 1900L, 1925L), Gender!='Both') |>  
+  filter(between(Age, 40, 70)) |>
+  nest(.by=c(Country, Gender, Year))  |>
+  mutate(models = lapply(data, function(df) lm(log(qx) ~ Age, data = df))) |>  
+  select(Country, Gender, Year, models) 
+```
+
+```{r}
+#| eval: false
+df_regs$models[[1]] |> 
+  broom::augment() |>
+  ggplot() +
+    aes(x=Age, y=`log(qx)`) +
+    geom_point() +
+    geom_smooth(method="lm", formula=y~x, se=FALSE) +
+    labs(
+      title=df_regs$Country[1],
+      subtitle=str_c(df_regs$Year[1], ', ', df_regs$Gender[1])
+    )
+
+``` 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+```{r}
+#| eval: false
+slope_intercep <- df_regs |>
+  mutate(coeffs = lapply(models, \(x) coefficients(x))) |>
+  mutate(interc = lapply(coeffs, \(x) x[1]), 
+         slope = lapply(coeffs, \(x) x[2])) |>
+  select(-models, -coeffs) |>
+  unnest(c(interc, slope))
+  
+```
+
+```{r}
+#| eval: false
+(
+  slope_intercep |> 
+  ggplot() +
+  aes(x=interc, y=slope, color=Year) +
+  geom_point() +
+  facet_grid(col=vars(Gender), row=vars(Country))) |>
+  plotly::ggplotly()
+```
+:::
+
+::: {.callout-note}
+
+### Question
+
+Pour chaque pays et chaque sexe, considérer la *cohorte* des individus nés en 1890. Déterminer   les quotients de mortalité effectivement subis par cette cohorte entre 1890 et 1980. Illustrer la différence entre les quotients de mortalité tirés des *tables du moment* de l'année 1890 et les quotients de mortalités effectivement subis.  
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+#| eval: false
+life_table_1890 <- life_table |>
+  filter(Year == 1890) |>
+  select(Country, Gender, Age, Area, qx) 
+
+cross_life_table <- (life_table |>
+  filter(Year >= 1890, Gender != 'Both') |>
+  select(Country, Gender, Year, Age, Area, qx) |>
+  filter(1890 + Age == Year) |> 
+  inner_join(life_table_1890,
+    by=c('Country', 'Gender', 'Age', 'Area')
+    ) 
+) 
+cross_life_table
+``` 
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+#| eval: false
+
+(
+  cross_life_table |>
+  filter(Country=='France') |>
+  ggplot() +
+  aes(x=Age) +
+  geom_point(aes(y=qx.x), shape='triangle') +
+  geom_line(aes(y=qx.y), linewidth=.5) +
+  scale_y_log10() +
+  facet_grid(col=vars(Gender)) +
+  labs(
+    title = "France"
+  )
+  ) |> plotly::ggplotly()
+
+``` 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+#| eval: false
+
+(
+  cross_life_table |>
+  ggplot() +
+  aes(x=Age) +
+  geom_point(aes(y=qx.x), 
+             shape='triangle',
+             size=.5,
+             alpha=.5) +
+  geom_line(aes(y=qx.y), linewidth=.5) +
+  scale_y_log10() +
+  facet_grid(row=vars(Country),
+             col=vars(Gender)) +
+  labs(
+    title = ""
+  )
+  ) |> plotly::ggplotly()
+
+``` 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+#| eval: false
+(
+  cross_life_table |>
+  ggplot() +
+  aes(x=Age) +
+  geom_point(aes(y=qx.x/qx.y), 
+             shape='triangle',
+             size=.5,
+             alpha=.5) +
+#  geom_line(aes(y=qx.y), linewidth=.5) +
+  scale_y_log10() +
+  facet_grid(row=vars(Country),
+             col=vars(Gender)) +
+  ylab("Ratio between experienced Qx and Qx at birth") +
+  labs(
+    title = ""
+  )
+  ) |> plotly::ggplotly()
+
+``` 
+:::
+
+
+::: {.content-visible when-profile="solution"}
+
+Voir Chapitre 2 Section 2.4 *The lexis diagram*, à propos de la notion de taux par âge pour une cohorte (*age specific rate for cohorts*).
+
+Souligner que les personnes âgées de 35 ans résidants en France en 1925 ne sont pas toutes issues de la cohorte  des personnes nées en France en 1890: il faudrait faire la part de l'immigration et des modifications de frontière (Alsace-Moselle).    
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+Données françaises.
+
+- évolution des quotients de mortalité des hommes aux âges 20-30 ans (1914-1918). Le rapport entre quotient de mortalité subit et le quotient de mortalité de l'année de naissance pas à 10 en 1914, décroit jusqu'à 4.8 en 1917, grimpe à 7 en 1918, puis redescend vers une valeur inférieure à 1 en 1921.  
+- variation brutale des quotients de mortalité chez les femmes en 1918, 1919, 1920.
+- le rapport augmente à nouveau en 1940, et surtout en 1944
+  
+Données anglaises et galloises.
+
+- évolution des quotients de mortalité des hommes aux âges 26-28 ans (1916-1918). Le scenario differe de celui de la France.
+- variation brutale des quotients de mortalité chez les femmes et les hommes en 1918, 1919, 1920.
+- variation des ratios en 1940
+- les ratios postérieurs à 1950 sont meilleurs pour les femmes
+
+Données italiennes 
+
+- Le rapport entre quotient de mortalité subit et le quotient de mortalité de l'année de naissance passe à 4 en 1915, et croît jusq'en  1918, puis redescend vers une valeur inférieure à 1 en 1921.
+- variation des ratios entre 1940 et 1945, surtout durant les dernières anneés.
+- les ratios postérieurs à 1950 sont meilleurs pour les femmes.
+  
+  
+Données suédoises, néerlandaises.
+
+- Variation brutale des quotients de mortalité chez les femmes et les hommes en 1918, 1919, 1920.
+- Au Pays-Bas, augmentation importantes des rapports entre quotients de mortalité subis et quotients de mortalité à la naissance en 1945.
+  
+:::
+
+
+## Barème
+
+
+
+
+```{r}
+#| include: false
+```
+
+
+| Critère | Points  | Détails |
+|:----------|:-------:|:--------|
+|Orthographe et grammaire | `r scales::label_percent()(4/20)` | English/Français {{<  fa pen-fancy >}}|
+|Graphiques  | `r scales::label_percent()(5/20)` | Choix des  `aesthetics`, `geom`, `scale` ... {{<  fa chart-area >}}|
+|Style des Graphiques  | `r scales::label_percent()(3/20)` | Titres, légendes, étiquettes ... {{<  fa chart-area >}} |
+|Manipulations de tables | `r scales::label_percent()(5/20)` | {{<  fa database >}} |
+|Respect DRY  | `r scales::label_percent()(3/20)` | Principe DRY  {{<  fab wikipedia-w  >}} [ Wikipedia ](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)|
+
+
+
+::: {.callout-caution}
+
+Ceci n'est pas un devoir d'Histoire. Ne cherchez pas à montrer votre culture. Demandez-vous  ce qu'il y a de remarquable dans les données, et énoncez les questions que ces données peuvent poser aux historiens.
+
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+#| eval: false
+life_table |> 
+  filter(Country=='France', between(Year,1895,1905), Gender=='Female', Age %in% c(0,1)) |> 
+  select(Year, Age, ex)
+```
+
+
+:::::

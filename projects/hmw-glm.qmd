@@ -1,0 +1,598 @@
+---
+title: "Linear Modeling"
+engine: knitr
+date: "`r Sys.time()`"
+
+execute:
+  echo: true
+  eval: false
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-glm-2024.html
+  pdf:
+    output-file: hmw-glm-2024.pdf
+
+draft: true
+standalone: true
+prefer-html: true
+---
+
+
+
+
+
+### {{< fa map >}} Objectives
+
+
+This homework is concerned with Gaussian Linear Models. The objective consists of working with simulated data and visualizing/illustrating the main constructions and theorems from the sections of the Statistical Inference course dedicated to Gaussian Linear Models. 
+
+We start from the `whiteside` dataset from `MASS` package (`R`). 
+
+```{r useful-pkg, include=FALSE}
+#| message: FALSE
+#| warning: FALSE
+#| eval: true
+require(tidyverse)
+require(glue)
+require(patchwork)
+require(DT)
+require(ggforce)
+```
+
+```{r}
+#| eval: true
+#| echo: false
+whiteside <- MASS::whiteside
+```
+
+Fit a linear model with formula `Gas ~ poly(Temp, degree=2, raw=T) * Insul`  to the `whiteside` data.
+
+```{r, echo=T, eval=T}
+lm2 <- lm(Gas ~ poly(Temp, degree=2, raw=T) * Insul, 
+          data=whiteside)
+```
+
+- Extract the coefficients vector ($\widehat{\beta}$) and the model matrix ($X$). 
+- Extract the estimate $\widehat{\sigma}$ of Gaussian noise standard deviation from the model.  
+
+```{r}
+#| eval: true
+#| echo: false
+beta <- coefficients(lm2)
+X <- model.matrix(lm2)
+sgm <- sigma(lm2)
+```
+
+You may rename the components of $\beta$ and the columns of $X$ up to your convenience. 
+
+```{r}
+#| echo: false
+#| eval: true
+names(beta) <- c("Int", "Temp^1", "Temp^2", "After", "After:Temp^1", "After:Temp^2")
+colnames(X) <- names(beta)
+```
+
+```{r}
+#| echo: false
+#| eval: true
+lm2 %>% 
+   broom::tidy() %>% 
+   mutate(term=names(beta))
+```
+
+### Simulate random data conforming to GLM with fixed design
+
+Generate $N = 1000$ instances of the Gaussian Linear Model defined by 
+$$
+\begin{bmatrix} \vdots \\
+Y \\ \vdots \end{bmatrix}
+ = \begin{bmatrix} \mbox{} & & \mbox{} \\
+ & X & \\
+ &   & \end{bmatrix} \times \widehat{\beta} + \widehat{\sigma} \times \begin{bmatrix} \vdots \\
+\epsilon\\ \vdots \end{bmatrix}
+$$
+where $\epsilon \sim \mathcal{N}(0, \text{Id}_{56})$ and $X, \widehat{\beta}$, and $\widehat{\sigma}$ have been extracted above from the linear fit to the `whiteside` data.   
+
+::: {.callout-caution}
+
+Try to avoid unnecessary computations.
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+
+```{r preparation-simulation}
+#| echo: false
+N <- 10000
+n <- nrow(X)
+Y <- X %*% beta
+qrX <- qr(X)
+rX <- qr.R(qrX)
+qX <- qr.Q(qrX)
+H <- qX %*% t(qX)
+InvrX <- solve(rX)
+CovBetas <- InvrX %*% t(InvrX)
+pinvX <- InvrX %*% t(qX)
+```
+
+:::
+
+
+For each simulated instance, fit a linear model.  
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+```{r simulation-glm}
+#| echo: false
+### Each column of `mat_Y` represents one simulation
+mat_Y <- matrix(rep(Y, N) + 
+                  rnorm(N *n, mean=0, sd=sgm), 
+                nrow=n, ncol=N)
+### Each column of `mat_...` represents a byproduct of a simulation
+mat_coeffs <- pinvX %*% mat_Y
+mat_fitted <- H %*% mat_Y
+mat_resid <- mat_Y - mat_fitted
+### Each coefficient of `sigma2_est` represents one estimation of the homoschedastic noise standard deviation
+sigma2_est <- apply(mat_resid^2, MARGIN=2, sum) / (n - length(beta))
+```
+ 
+:::
+
+
+Now you should have $N$ identically distributed, independent realizations of the response vector $Y$ (and with some more work, realizations of prediction vectors $\widehat{Y}$).   Denote the $N$ independent realizations of the response vectors by $Y^*_1, \ldots, Y^*_N$, and denote the $N$ realizations of the estimators $\widehat{\beta}^*_1, \ldots, \beta^*_{N}$ and $\widehat{\sigma}^*_1, \ldots, \widehat{\sigma}^*_N$. Use the same style of notation for predictions and residuals. 
+
+The  [Statistical Inference course](https://statsfonda.github.io/site/) tells us a lot of things about the distribution of the response vectors, the prediction vectors, the residuals,  and so on. Those theoretical results are used by function `lm()`, method `summary.lm()`, and diagnostic plot methods `plot.lm()` (and also by `aov()`, `anova()`, `stepAIC()`, ...)
+
+### Distribution of estimators of noise variance
+
+Plot your sample of estimators of the noise variance $\widehat{\sigma}^*_1, \ldots, \widehat{\sigma}^*_N$. Compare with the theoretical density of the distribution of these estimators (histograms, CDF, quantile plots). 
+
+For $\alpha=5\%, 1\%$, compute the $N$ confidence regions for $\beta$ ($N$ ellipsoids), and compute the empirical *coverage* of your confidence regions (the number of times the true parameter belongs to the confidence region). How should this empirical coverage be distributed? What is its expectation? its departure from expectation? 
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+```{r}
+#| echo: false
+tibble(sigma2_est = (n - length(beta)) * sigma2_est/(sgm^2)) %>% 
+    ggplot() + 
+    aes(x=sigma2_est) +
+    geom_histogram(aes(y=after_stat(density)), color="black", fill="white", alpha=.2, bins=30) +
+    stat_function(fun=dchisq, args=list(df=n-length(beta)), linetype="dotted") +
+    labs(
+        title="Histogram of Sums of Squared residuals",
+        subtitle =glue("{N} fits, generated according to a GLM derived from whiteside data"),
+        caption=glue("The dotted line is the density of the Chi-square distribution with the correct degrees of freedom : {n -length(beta)}")
+    ) +
+    xlab("Sum of Squared Residuals normalized by noise variance")
+```
+
+ 
+:::
+
+### Fluctuations of coefficients estimates (I)
+
+According to the GLM, the distribution of the coefficients estimates $\widehat{\beta}^*_1, \ldots, \widehat{\beta}^*_N$ is known if the noise variance is known. 
+
+Visualize  the empirical joint distribution of $(\widehat{\beta}^*_i[1], \widehat{\beta}^*_i[2])$. Compare with theoretical distribution.   
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+```{r}
+#| echo: false 
+df_coeff <- t(mat_coeffs) %>% 
+  as_tibble() %>% 
+  setNames(names(beta))
+```
+
+```{r}
+#| echo: false
+#| fig-cap: "Estimates of `Intercept` and `Temp^1`. Each point represents one estimation. This is a scatterplot of an i.i.d. sample of a Gaussian distribution. The dotted line is a Gaussian isodensity line. The dashed line is a t isodensity line." 
+
+df_coeff %>% 
+ ggplot() +
+ aes(y=Int, x =`Temp^1`) +
+ geom_point(size=.1, alpha=.2)+
+ geom_smooth(method="lm", formula = y ~ x, se=FALSE) +
+ stat_density_2d() +
+ geom_abline(slope=-1.7218, intercept = 6.212) +
+ stat_ellipse(type="norm", linetype="dotted") + 
+ stat_ellipse(type = "t", linetype="dashed") +
+ labs(title="Joint estimates of coefficients in Gaussian Linear Model") # +
+ # coord_fixed() 
+```
+
+```{r}
+#| echo: false
+```
+
+```{r}
+#| echo: false
+### cov(df_coeff) - CovBetas * sgm^2
+(CovBetas[1,2]/sqrt(CovBetas[1,1]*CovBetas[2,2]))^2 # coefficient of determination R-squared
+
+CovBetas[1,2]/CovBetas[2,2]  # slope 
+
+lm(Int ~ `Temp^1`, df_coeff ) %>% 
+  summary()
+```
+
+:::
+
+### Fluctuations of coefficients estimates (II) : Studentized statistics
+
+If the noise variance is not known, according to the GLM theory, we can use the noise variance estimator to build confidence regions. 
+
+Investigate and illustrate (histograms, CDF and quantiles plots) the distribution of the coefficients $\frac{1}{\widehat{\sigma}}A \times (\widehat{\beta}^*-\widehat{\beta})$ where $A$ is a well-chosen matrix (that may depend on the design). 
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+```{r}
+#| echo: false
+cov(df_coeff[, 1:2])
+
+df_studentized_coef <- ((as.matrix(df_coeff) - matrix(1, nrow=N, ncol=1) %*% matrix(beta, nrow= 1, ncol=6)) %*% diag((diag(CovBetas))^(-1/2))) %>% 
+  as_tibble(.name_repair="unique") %>% 
+  setNames(names(beta)) %>% 
+  bind_cols(sgm=sqrt(sigma2_est)) %>% 
+  mutate(across(-sgm, ~ .x/sgm))  
+
+
+```
+
+
+```{r}
+#| echo: false
+df_studentized_coef %>% 
+ select(-sgm) %>% 
+ pivot_longer(cols=everything(), 
+              names_to="var", 
+            values_to ="val") %>% 
+ ggplot() +
+ aes(x=val, color=var) +
+ geom_histogram(aes(y=after_stat(density)), 
+                position="dodge", 
+                fill="white", 
+                alpha=.2, 
+                bins=30) +
+ stat_function(fun= dt, 
+               args=list(df=n-length(beta)), 
+               linetype="dashed")+
+ facet_wrap(~ var)  +
+ labs(title="Centered and Studentized coefficient estimates",
+ subtitle=glue("{N} estimations, generated according to a GLM derived from whiteside data"),
+ caption=glue("Dashed lines represent the density of the t distribution with {n-length(beta)} degrees of freedom")) +
+ theme(legend.position = "none")
+```
+
+
+
+```{r}
+#| echo: false
+df_studentized_coef %>% 
+  mutate(across(-sgm, ~ 2* pt(-abs(.x), df=n-length(beta)))) %>% 
+  select(-sgm) %>%
+  pivot_longer(
+          cols = everything(),
+          names_to = "var",
+          values_to = "val"
+  ) %>%
+      ggplot() +
+      aes(x = val, color = var) +
+      stat_bin(aes(y = after_stat(density)), 
+               breaks = seq(0, 1, .033), 
+               color = "black", 
+               fill = "white", alpha = .5) +
+      geom_hline(yintercept=1, linetype="dotted") +
+      facet_wrap(~var) +
+      labs(
+          title = "t-values from Studentized coefficient estimates under null hypothesis",
+          subtitle = glue("{N} estimations, generated according to a GLM derived from whiteside data"),
+          caption = glue("Dotted lines represent the density of the uniform distribution over [0,1]")
+      ) + xlab("") +
+      theme(legend.position = "none")
+```
+
+```{r}
+#| echo: false
+#| fig-cap: "Under the null 
+#|   hypothesis, all lines are sample paths of an 
+#|   empirical bridge. All lines are realizations of a functional random 
+#|   variables. Their common distribution is close to the distribution of the 
+#|   Brownian bridge"
+
+df_studentized_coef %>%
+    mutate(across(-sgm, ~ 2 * pt(-abs(.x), df = n - length(beta))) )%>% 
+  select(-sgm) %>%
+  pivot_longer(
+          cols = everything(),
+          names_to = "term",
+          values_to = "val"
+  ) %>% 
+  group_by(term) %>% 
+  arrange(val, .by_group=T ) %>% 
+  mutate(rnk=row_number()) %>% 
+  ungroup() %>% 
+  ggplot() +
+      aes(x = val, y=sqrt(N)*(rnk/ N-val), color = term) +
+      geom_point(size=.2) +
+      labs(
+          title = "Centered and rescaled CDF for t-values from Studentized coefficient estimates under null hypothesis",
+          subtitle = glue("{N} estimations, generated according to a GLM derived from whiteside data")
+      ) +
+      xlab("t-values") +
+      ylab("Rescaled and centered CDF")
+
+```
+
+
+```{r}
+#| echo: false
+df_studentized_coef %>%
+    mutate(across(-sgm, ~ 2 * pt(-abs(.x), df = n - length(beta)))) %>%
+    select(-sgm) %>%
+    pivot_longer(
+        cols = everything(),
+        names_to = "term",
+        values_to = "val"
+    ) %>%
+    group_by(term) %>%
+    group_modify(.f= ~ ks.test(.x[["val"]], "punif") %>% broom::tidy()) %>% 
+    mutate(across(where(is.numeric), ~signif(.x, digits=3))) %>% 
+    DT::datatable(extensions = "Responsive")
+```
+
+
+```{r}
+#| echo: false
+### bind_cols((df_coeff - beta) / sqrt(diag(CovBetas)), sgm_est = sqrt(sigma2_est), ) %>% 
+###   mutate(across(-sgm_est, ~ .x/ sgm_est)) %>% glimpse()
+
+```
+
+
+:::
+
+
+### Regression of $\widehat{\beta}^*[6]$ with respect to all other estimated coefficients $\widehat{\beta}^*[1,..,5]$
+
+The sample of $N$ realizations of $\widehat{\beta}^*$ : $\widehat{\beta}^*_1, \ldots, \widehat{\beta}^*_N$
+may be considered as an instance of linear regression with respect to a *random design* where the response variable is $\widehat{\beta}^*[6]$  while the explanatory variables are $\widehat{\beta}^*[1], \ldots, \widehat{\beta}^*[5]$.
+
+Compute the optimal regression coefficients. What is the distribution of $\widehat{\beta}^*[6] - \mathbb{E}\left[ \widehat{\beta}^*[6] \mid \widehat{\beta}^*[1], \ldots, \widehat{\beta}^*[5] \right]$? Investigate graphically. 
+
+
+### Diagnostic plots when the GLM assumptions hold
+
+Pick $1$ linear fit amongst the $N$ linear fits performed on the simulated data. Draw the four diagnostic plots. Comment (briefly). 
+
+
+### Overparametrized model
+
+Define $\widehat{\theta} \in \mathbb{R}^6$ by zeroing the coefficients of $\widehat{\beta}$  corresponding to the quadratic terms (with respect to `Temp`)
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+```{r}
+#| echo: false
+theta <- beta
+theta[c(3,6)] <- 0
+theta
+```
+ 
+:::
+
+
+Generate $N = 1000$ instances of the Gaussian Linear Model defined by 
+$$
+\begin{bmatrix} \vdots \\
+Y \\ \vdots \end{bmatrix}
+ = \begin{bmatrix} \mbox{} & & \mbox{} \\
+ & X & \\
+ &   & \end{bmatrix} \times \widehat{\theta} + \widehat{\sigma} \times \begin{bmatrix} \vdots \\
+\epsilon\\ \vdots \end{bmatrix}
+$$
+where $\epsilon \sim \mathcal{N}(0, \text{Id}_{56})$.  
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+```{r}
+Y <- X %*% theta
+mat_Y <- matrix(rep(Y, N) + rnorm(N * n, mean = 0, sd = sgm), nrow = n, ncol = N)
+mat_coeffs <- pinvX %*% mat_Y
+mat_fitted <- H %*% mat_Y
+mat_resid <- mat_Y - mat_fitted
+sigma2_est <- apply(mat_resid^2, MARGIN = 2, sum) / (n - length(theta))
+```
+
+```{r}
+Z <- X[, -c(3,6)]
+qrZ <- qr(Z)
+rZ <- qr.R(qrZ)
+qZ <- qr.Q(qrZ)
+HZ <- qZ %*% t(qZ)
+InvrZ <- solve(rZ)
+CovBetasZ <- InvrZ %*% t(InvrZ)
+pinvZ <- InvrZ %*% t(qZ)
+```
+
+
+```{r}
+mat_coeffs_Z <- pinvZ %*% mat_Y
+mat_fitted_Z <- HZ %*% mat_Y
+mat_resid_Z <- mat_Y - mat_fitted_Z
+sigma2_est_Z <- apply(mat_resid_Z^2, MARGIN = 2, sum) / (n - length(theta)-2)
+F_stats <- (apply((mat_resid_Z - mat_resid)^2, MARGIN = 2, sum) / 2) / sigma2_est
+
+
+### summary(F_stats)
+### qf(c(1,2,3)/4,df1=2, df2=50)
+```
+
+:::
+
+
+### Estimators of noise variance
+
+
+Fit all $N$ realizations  with the same formula as above. Compute the new estimators of the noise variance. 
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+
+```{r}
+#| echo: false
+tibble(sigma2_est = (n - length(beta)) * sigma2_est / (sgm^2)) %>%
+    ggplot() +
+    aes(x = sigma2_est) +
+    geom_histogram(aes(y = after_stat(density)), color = "black", fill = "white", alpha = .2) +
+    stat_function(fun = dchisq, args = list(df = n - length(beta)), linetype = "dotted") +
+    labs(
+        title = "Histogram of Sums of Squared residuals",
+        subtitle = glue("{N} fits, generated according to a GLM derived from whiteside data"),
+        caption = glue("The dotted line is the density of the Chi-square distribution with the correct degrees of freedom : {n -length(beta)}")
+    ) +
+    xlab("Sum of Squared Residuals normalized by noise variance")
+```
+
+:::
+
+### Student's tests for coefficients
+
+Perform student's tests for the coefficient vectors. How many times do you reject the null hypothesis  concerning the  coefficients of $\widehat{\beta}$  corresponding to the quadratic terms (with respect to `Temp`) if you choose a size/level equal
+to $5\%$. Plot the sample of the $|t|$ values for the coefficients of $\widehat{\beta}$  corresponding to the quadratic terms (with respect to `Temp`).
+
+Plot the histogram of the empirical distrinbution of $p$-values. Compare with theoretical distribution of $p$ values.  
+
+
+```{r}
+#| echo: false
+```
+
+
+### Fisher's test(s)
+
+
+We aim at testing 
+
+- $H_0$ : $\widehat{\theta}[3] = \widehat{\theta}[6] = 0$
+(null hypothesis, assuming that the third and the sixth coefficients represent `Temp^2` and `Temp^2:InsulAfter`)
+
+versus 
+
+- $H_1$ : $\widehat{\theta}[3] \neq 0 \quad \text{or} \quad \widehat{\theta}[6] \neq 0$ (alternative)
+
+Compute the Fisher statistics for the $N$ simulated response vectors (when the null hypothesis is true). Plot the Fisher statistics and compare to the theoretical distribution under the the null hypothesis. If you choose a level/size equal to $1\%$, how many times do you reject the null hypothesis?
+
+Compute the Fisher statistics for the $N$ simulated response vectors (when the null hypothesis is not true). Plot the Fisher statistics and compare to the theoretical distribution under the the null hypothesis. If you choose a level/size equal to $1\%$, how many times do you reject the null hypothesis?
+
+
+Again plot a histogram of the empirical distribution of $p$-values
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+```{r}
+#| echo: false
+tibble(stats = F_stats) %>% 
+    ggplot() + 
+    aes(x=stats) +
+    stat_density(adjust=1, alpha=.2, color="black", fill="white") +
+    # geom_histogram(aes(y=after_stat(density)), color="black", fill="white", alpha=.2,  bins=50) +
+    stat_function(fun=df, args=list(df1=50, df2=2), linetype="dotted") +
+    labs(
+        title="Histogram of Fisher statistics",
+        subtitle =glue("{N} fits, generated according to a GLM derived from whiteside data under H0"),
+        caption=glue("The dotted line is the density of the Fisher distribution with the correct degrees of freedom : {n -length(beta)}, 2")
+    ) +
+    xlab("Fisher statistics")
+
+```
+
+
+<!-- # Log-likelihood function -->
+
+
+```{r}
+#| echo: false
+sample <- rnorm(n=1000, mean = 2, sd = 3)
+
+lm1 <- lm(sample ~ 1) 
+
+lm1 %>% 
+  broom::tidy()
+
+lm1 %>% 
+  broom::glance()
+
+foo <- function(x, y)
+  sum(log(dnorm(sample, x, y)))
+```
+
+
+```{r}
+#| echo: false
+bar <- expand_grid(mu=seq(1.5, 2.5,by=.01), 
+            sgm=seq(2.5, 3.5,by=.01)) %>% 
+  rowwise() %>% 
+  mutate(llk=foo(mu,sgm)) %>% 
+  ungroup() 
+
+bar %>% 
+  ggplot() +
+  stat_contour_filled(aes(x=mu, y=sgm, z=llk) , 
+               bins=20, 
+               show.legend = T) +
+  geom_point(mapping=aes(x=x, y=y), data=tibble(x=1.971523	,                          y=3.006294),           shape='+', size=3)
+```
+
+```{r}
+#| echo: false
+### require(rgl)
+```
+
+:::
+
+### Performance of `stepAIC`
+
+Run `stepAIC()` on the overparametrized models you obtain. 
+Describe graphically the distribution of outcomes, and the distribution of the AIC criteria for the selected models. 
+
+
+### Departing from the Gaussian Linear Model assumptions
+
+Replay the above described simulations but replace the Gaussian noise with Student's noise with three degrees of freedom  `rt(N, df=3, ncp=0)` (with and without overparametrizatio). Recompute the Fisher statistics for testing $H_0$ against $H_1$. 
+Visualize the distributions compare to the theoretical distribution of the Fisher statistics. If you choose a level/size equal to $1\%$, how many times do you reject the null hypothesis?
+
+
+
+### References 
+
+
+- [Poly. S. Boucheron](https://stephane-v-boucheron.fr/files/stats/notes-17-18.pdf)
+- [Poly. S. Coste](https://statsfonda.github.io/site/)
+
+### {{<  fa graduation-cap >}} Grading criteria 
+
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+|Spelling and syntax | `r scales::label_percent()(4/20)` | English/French {{<  fa pen-fancy >}}|
+|Plots correction | `r scales::label_percent()(5/20)` | choice of `aesthetics`, `geom`, `scale` ... {{<  fa chart-area >}}|
+|Computing Statistics | `r scales::label_percent()(6/20)` | Aggregations, LR, PCA, CA, ... {{<  fa chart-area >}} |
+|DRY compliance | `r scales::label_percent()(5/20)` | DRY principle at {{<  fa brands wikipedia-w  >}} [ Wikipedia ](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)|
+

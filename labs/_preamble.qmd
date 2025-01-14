@@ -7,7 +7,7 @@
 |:---------------------------|
 | {{< var curriculum >}}     |
 | {{< var university >}}     |
-| [Année {{< var year >}}]() |
+| Année {{< var year >}}     |
 | {{< var homepage >}}       |
 | {{< var moodle >}}         |
 
