@@ -1,0 +1,11 @@
+
+
+# Analyse des Données : `r params$title`
+
+### `r Sys.Date()`
+
+#### [`r params$curriculum`](`r params$homepage_curriculum`)
+
+#### [`r params$coursetitle`](`r params$homepage`)
+
+#### [`r params$lecturer`](http://stephane-v-boucheron.fr)
