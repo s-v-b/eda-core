@@ -16,6 +16,9 @@ format:
     include-before-body: 
       - text: "\\renewcommand{\\contentsname}{}"
 
+code-tools: 
+  source: repo
+
 
 prefer-html: true
 

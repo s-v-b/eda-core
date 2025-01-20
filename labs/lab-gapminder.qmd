@@ -387,14 +387,28 @@ There is simple way to filter rows satisfying some condition. It consists
 in mimicking indexation in a matrix, leaving the colum index empty, replacing 
 the row index by a condition statement (a logical expression) also called a mask.  
 
+
 ```{r}
 #| label: gapminder_filtered
 #| results: markup
 # q: in gapminder table extract all raws concerning year 2002
-gapminder_2002 <- gapminder[gapminder$year==2002, ]
+
+gapminder_2002 <- gapminder |>
+  filter(year==2002)  # 
+
+gapminder_2002 <- gapminder[gapminder$year==2002,]
 ```
 
-Have a look at `gapminder$year==2002`. What is the type/class of this expression?
+
+Have a look at 
+
+```{r} 
+#| eval: false
+gapminder$year==2002
+```
+
+What is the type/class of this expression?
+
 
 This is possible in base `R` and very often convenient. 
 
@@ -406,9 +420,16 @@ Nevertheless, this way of performing row filtering does not emphasize the connec
 
 In the parlance of Relational Algebra, `filter` performs a *selection*
 of rows. Relational expression
-$$σ_{\text{condition}}(\text{Table})$$ translates to
 
-```{.r}
+$$σ_{\text{condition}}(\text{Table})$$ 
+
+translates to
+
+
+```{r}
+#| label: fake-relational-algebra
+#| eval: false 
+
 filter(Table, condition)
 ```
 
@@ -416,7 +437,9 @@ where $\text{condition}$ is a boolean expression that can be evaluated
 on each row of $\text{Table}$. In `SQL`, the relational expression would
 translate into
 
-```{.sql}
+```{sql}
+--| label: fake-sql
+--| eval: false
 SELECT 
   *
 FROM 
@@ -497,8 +520,7 @@ p <- gapminder_2002 |>
 
 ::: {.callout-note collapse="true"}
 
-You should define a `ggplot` object with data layer `gapminder_2022` and
-call this object `p` for further reuse.
+You should define a `ggplot` object with data layer `gapminder_2022` and call this object `p` for further reuse.
 
 :::
 
@@ -671,11 +693,12 @@ To pay tribute to Hans Rosling, we need to take care of two
 # q: use logarithmic scale for both axes
 p <- p +
   scale_x_log10() +
-#  scale_size_area() +
+##  scale_size_area() +
   ggtitle("Gapminder 2002, scaled")
 
 p
 ```
+
 
 :::
 
