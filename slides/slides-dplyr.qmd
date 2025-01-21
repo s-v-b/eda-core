@@ -1,0 +1,1808 @@
+---
+title: "Tables manipulation with dplyr"
+categories: [dplyr, SQL, tables]
+date: "2021/12/21 (updated: `r Sys.Date()`)"
+
+
+bibliography: mon_chapeau.bib
+
+format: 
+  revealjs:
+    header: "Table calculus with dplyr"
+
+engine: knitr
+# standalone: true
+---
+
+
+
+
+
+
+
+# Tables
+
+
+
+
+## Tables (examples)
+
+- Speadsheets (Excel)
+
+- {{< fa database >}} Relational tables
+
+- Dataframes in datascience frameworks
+
+  - {{< fa brands r-project >}}: `data.frame`, `tibble`, ...
+  - {{< fa brands python >}}: `pandas.dataframe`
+  - `spark`: `dataframe`
+  - `Dask`: `dataframe`
+  - and many others
+
+
+
+
+## Tables (Why ?)
+
+In Data Science, each framework comes with its own flavor(s) of table(s)
+
+{{< fa database >}} Tables from relational databases serve as inspiration
+
+In {{< fa brands r-project >}} legacy dataframes shape the life of statisticians and data scientists
+
+The purpose of this session is
+
+- describe dataframes from an end-user viewpoint (we leave aside implementations)
+
+- presenting tools for
+  - accessing information within dataframes (*querying*)
+  - summarizing information (*aggregation queries*)
+  - cleaning/cleaning dataframes  (*tidying*)
+
+
+
+
+
+## Loading tables and packages
+
+
+```{r}
+#| label: setup-2
+#| eval: true
+require("tidyverse")      # All we need is there
+require("nycflights13")    # for flight data
+require("gt")
+require("kableExtra")
+# 
+data(flights)
+```
+
+
+
+## About loaded packages 
+
+- Metapackage [`tidyverse`](https://www.tidyverse.org) provides tools to create, query, tidy dataframes as well as tools to load data from various sources and save them in persistent storage
+
+- [`nycflights13`](https://github.com/tidyverse/nycflights13) provides the dataframes we play with
+
+- [`gt`](https://gt.rstudio.com)  for tayloring table displays
+
+
+
+## The `flights` table
+
+
+::: {.columns}
+
+::: {.column}
+```{r}
+head(flights) |>
+  glimpse(width = 30) 
+```
+
+:::
+::: {.column}
+
+- A dataframe is a two-ways (two-dimensional) table
+
+- `head(df)` displays the first 6 rows of its first argument
+
+- The vectors making a dataframe may have different types/classes (a dataframe is not a matrix)
+
+- Compare `str()`, `glimpse()`, `head()`
+
+:::
+::: 
+
+
+
+## Table schema
+
+
+
+A table is a _list_ of _columns_
+
+Each _column_ has
+
+- _name_ and
+- _type_ (_class_ in {{< fa brands r-project >}}
+
+
+```{r}
+#| label: glimpse-schema
+#| eval: true
+#| output-location: column
+glimpse(flights,   #<<
+        width=50)
+```
+
+
+
+
+##
+
+- `flights` has `r length(flights)` columns
+- Each column is  a sequence (`vector`) of items with the same type/class
+- All columns have the same length
+- `flights` has `r nrow(flights)` rows
+- In {{< fa database >}} parlance, a row is (often) called a _tuple_
+- In {{< fa database >}} parlance, a column is (often) called a _variable_
+
+
+
+## Column types
+
+::: {.columns}
+::: {.column}
+
+| class |  columns |
+|:--:|:-----|
+| `integer`   |  'year' 'month' 'day' 'dep_time' 'sched_dep_time' 'arr_time' 'sched_arr_time' 'flight'  |
+| `numeric`  | 'dep_delay' 'arr_delay' 'air_time' 'distance' 'hour' 'minute'  |
+| `character`   |  'carrier' 'tailnum' 'origin' 'dest' |
+| `POSIXct`   |  'time_hour' |
+| `POSIXt`   |  'time_hour' |
+
+
+:::
+::: {.column}
+
+
+A column, as a vector, may be belong to different classes
+
+Other classes:  `factor` for categorical variables
+
+Columns `dest`, `origin` `carrier` could be coerced as factors
+
+Should columns `dest`  and `origin` be coerced to the same factor?
+
+:::
+::: 
+
+
+
+
+
+
+
+## `nycflights13`
+
+
+::: {.center}
+
+
+![](/images/schema-nycflights.png){width="40%"}
+
+
+:::
+
+
+
+## Columns specification
+
+
+::: {.columns}
+
+::: {.column width="30%"}
+```{r, eval=FALSE}
+as.col_spec(flights)
+```
+:::
+
+::: {.column}
+
+```{r, eval=FALSE}
+cols(
+  year = col_integer(),
+  month = col_integer(),
+  day = col_integer(),
+  dep_time = col_integer(),
+  sched_dep_time = col_integer(),
+  dep_delay = col_double(),
+  arr_time = col_integer(),
+  sched_arr_time = col_integer(),
+  arr_delay = col_double(),
+  carrier = col_character(),
+  flight = col_integer(),
+  tailnum = col_character(),
+  origin = col_character(),
+  dest = col_character(),
+  air_time = col_double(),
+  distance = col_double(),
+  hour = col_double(),
+  minute = col_double(),
+  time_hour = col_datetime(format = "")
+)
+```
+:::
+::: 
+
+
+
+##
+
+$\approx$ table schema in relational databases
+
+Column specifications are useful when loading dataframes from structured text files
+like `.csv` files
+
+`.csv` files do not contain typing information
+
+File loaders from package `readr` can be tipped about column classes using column specifications
+
+
+
+# SQL and Relational algebra with `dplyr`
+
+
+
+## {{< fa syringe >}}
+
+- SQL stands for structured/simple Query Language
+
+- A query language elaborated during the 1970's at IBM by E. Codd
+
+- Geared towards exploitation of collections of relational tables
+
+- Less powerful but simpler to use than a programming language
+
+- `dplyr` is a principled {{< fa brands r-project >}}-friendly
+implementation of SQL ideas (and other things)
+
+At the core of SQL lies the idea of a table calculus called **relational algebra**
+
+
+
+## Relational algebra (basics)
+
+Convention: $R$  is a table with columns $A_1, \ldots, A_k$
+
+::: {.callout-note}
+
+### Projection (picking columns)
+
+$\pi(R, A_1, A_3)$
+
+:::
+
+
+::: {.callout-note}
+
+### Selection/Filtering (picking rows)
+
+$\sigma(R, {\text{condition}})$
+
+:::
+
+::: {.callout-note}
+
+###  Join (mulitple tables operation)
+
+$\bowtie(R,S, {\text{condition}})$
+
+:::
+
+{{< fa hand-point-right >}} Any operation produces a table
+
+{{< fa hand-point-right >}} The schema of the derived table depends on the operation (but does not depend on the content/value of the operands)
+
+
+##
+
+Relational calculus relies on a small set of basic operations $\pi, \sigma, \bowtie$
+
+Each operation has one or two table **operands** and produce a table
+
+{{< fa exclamation-triangle >}} There is more to SQL than relational algebra
+
+
+## Projection
+
+
+$\pi(R, {A_1, A_3})$
+
+A projection  $\pi(\cdot, {A_1, A_3})$ is defined by a set of column names, say $A_1, A_3$
+
+If $R$ has columns with given names, the result is a table with names $A_1, A_3$ and one row per row of $R$
+
+A projection is parametrized by a list of column names
+
+
+
+
+## {{< fa tools >}} Package `dplyr`
+
+::: {.columns}
+::: {.column width="30%"}
+
+- [_Tranformation_ chapter in R4DS](https://r4ds.had.co.nz/transform.html)
+
+- [Cheat sheet I](https://github.com/rstudio/cheatsheets/blob/main/data-transformation.pdf)
+
+- [Cheat sheet II](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf)
+
+:::
+::: {.column width="70%"}
+
+```{r, echo=FALSE}
+knitr::include_url("https://dplyr.tidyverse.org")
+```
+
+[https://dplyr.tidyverse.org](https://dplyr.tidyverse.org)
+
+::: 
+
+:::
+
+##
+
+Base {{< fa brands r-project >}} provides tools to perform relational algebra operations
+
+But:
+
+- Base {{< fa brands r-project >}} does not provide a consistent API
+
+- The lack of a consistent API makes operation chaining tricky
+
+
+
+## `dplyr` verbs
+
+Five basic verbs:
+
+- Pick observations/rows by their values (`filter()`)  .fr[ σ(...) ]
+
+- Pick variables by their names (`select()`)    .fr[ π(...)]
+
+- Reorder the rows (`arrange()`)
+
+- Create new variables with functions of existing variables (`mutate()`)
+
+- Collapse many values down to a single summary (`summarise()`)
+
+. . .
+
+And
+
+- `group_by()`  changes the scope of each function from operating on the entire dataset to operating on it group-by-group
+
+
+
+
+
+## {{< fa umbrella-beach >}} tidyverse
+
+::: {.columns}
+
+::: {.column}
+> All verbs work similarly:
+
+> The first argument is a data frame (table).
+
+> The subsequent arguments describe what to do with the data frame, using the variable/column names (without quotes)
+
+> The result is a new data frame (table)
+
+:::
+
+::: {.column}
+
+```{r, echo=FALSE}
+knitr::include_url("https://www.tidyverse.org")
+```
+
+:::
+:::
+
+
+
+
+## `dplyr::select()` as a projection operator (π)
+
+$\pi(R, \underbrace{A_1, \ldots, A_3}_{\text{column names}})$
+
+```{r, eval=FALSE}
+select(R, A1, A3) #<<
+```
+
+or,  equivalently
+
+```{r, eval=FALSE}
+R |> select(A1, A3) #<<
+```
+
+{{< fa hand-point-right >}} `|>` is the pipe operator from `magrittr`
+
+{{< fa hat-wizard >}} `x |> f(y, z)` is translated to `f(x, y, z)` and then evaluated
+
+##
+
+- Function `select` has a variable number of arguments
+
+- Function `select`  has a variable number of arguments
+
+- Function `select` allows to pick column by names (and much more)
+
+- Note that in the current environment, there are no objects called `A1`, `A3`
+
+- The consistent API allows to use the pipe operator
+
+
+
+## Toy tables
+
+::: {.columns}
+::: {.column}
+
+```{r toy-tables, message=FALSE, warning=FALSE}
+#| eval: true
+spam <- set.seed(42)
+
+R <-  tibble(A1=seq(2, 10, 2),
+             A2=sample(letters, 5),
+             A3=seq(from=date("2021-10-21"),
+                    to=date("2021-11-20"),
+                    by=7),
+             D=sample(letters, 5))
+
+S <- tibble(E=c(3,4,6,9, 10),
+            F=sample(letters, 5),
+            G=seq(from=date("2021-10-21"),
+                   to=date("2021-10-21")+4, by=1),
+            D=sample(letters,5)
+          )
+```
+
+:::
+::: {.column}
+
+```{r, echo=FALSE}
+#| eval: true
+knitr::kable(R, caption="R")
+knitr::kable(S, caption="S")
+```
+
+:::
+:::
+
+
+
+## Projecting toy tables 
+
+::: {.columns}
+::: {.column}
+
+```{r, echo=TRUE}
+#| eval: true
+R |> 
+  dplyr::select(A2,D) |> 
+  knitr::kable(caption="Projecting R")
+```
+
+:::
+::: {.column}
+
+
+```{r, echo=TRUE}
+#| eval: true
+R |> 
+  dplyr::select(- where(is.character)) |> 
+  knitr::kable(caption="Projecting R, all but character columns")
+```
+
+
+:::
+::: 
+
+
+
+
+
+
+
+## Projecting `flights` on `origin`  and `dest`
+
+
+
+
+```{r}
+#| label: flights-select
+#| output-location: column
+#| eval: true
+flights |>
+  select(origin, dest) |>  #<<
+  head()
+```
+
+A more readable equivalent of
+
+```{r, eval=FALSE}
+head(select(flights,
+            origin,
+            dest),
+     10)
+```
+
+```{.sql}
+SELECT 
+  origin, dest
+FROM 
+  flights
+LIMIT 10;
+```
+
+
+
+
+
+
+
+
+
+## $\sigma(R, \text{condition})$
+
+- A selection/filtering operation is defined by a condition that can be checked on the rows of tables with convenient schema
+
+- $\sigma(R, \text{condition})$ returns a table with the same schema as $R$
+
+- The resulting table contains the rows/tuples of $R$ that satisfy $\text{condition}$
+
+- $\sigma(R, \text{FALSE})$ returns an empty table with the same schema as $R$
+
+
+
+
+
+
+## Chaining filtering and projecting
+
+
+```{r}
+#| label: toy-filter-project
+#| output-location: column
+start <- date("2021-10-27")
+end <- start + 21
+
+R |>
+#  filter(A2 > "n") |>  #<<
+  filter(between(A3, start, end)) |>
+  select(A1, A3) #<<
+```
+
+
+::: {.aside}
+Filtering dropped one row
+
+Projecting dropped two columns
+
+:::
+
+
+
+## Selecting `flights` based on `origin`  and `dest`
+
+and then projecting on `dest, time_hour, carrier`
+
+
+
+```{r}
+#| label: flights-filter-select
+#| output-location: column
+
+flights |>
+  filter(dest %in% c('ATL', 'LAX'), #<<
+         origin == 'JFK') |>
+  select(dest, time_hour, carrier) |> #<<
+  head()
+```
+
+In SQL ({{< fa database >}} parlance:
+
+```{.sql}
+SELECT 
+  dest, time_hour, carrier
+FROM 
+  flights
+WHERE 
+  dest IN ('ATL', 'LAX') AND
+  origin = 'JFK'
+LIMIT 6
+```
+
+
+
+
+
+
+## Logical operations
+
+
+- `filter(R, condition_1, condition_2)` is meant to return the rows of `R` that satisfy `condition_1` **and** `condition_2`
+
+- `filter(R, condition_1 & condition_2)` is an equivalent formulation
+
+- `filter(R, condition_1 | condition_2)` is meant to return the rows of `R` that satisfy `condition_1` **or** `condition_2` (possibly both)
+
+- `filter(R, xor(condition_1,condition_2))` is meant to return the rows of `R` that satisfy **either** `condition_1` **or** `condition_2` (just one of them)
+
+- `filter(R, ! condition_1)` is meant to return the rows of `R` that **do not** satisfy  `condition_1`
+
+
+
+## Overview of set and boolean operations
+
+
+![](/images/transform-logical.png)
+
+
+
+## {{< fa skull-crossbones >}} Missing values!
+
+Numerical column `dep_time` contains many `NA's` (missing values)
+
+```{r}
+summary(flights$dep_time)
+```
+
+{{< fa hand-point-right >}} Missing values (`NA` and variants) should
+be handled with care
+
+```{r, results='asis'}
+NA & TRUE
+NA | TRUE
+```
+
+
+
+## Truth tables for three-valued logic
+
+::: {.columns}
+::: {.column}
+
+{{< fa exclamation-triangle >}} {{< fa brands r-project >}} uses _three-valued logic_
+
+{{< fa hand-point-right >}} Generate complete truth tables for `and, or, xor`
+
+```{r}
+#| echo: true
+v <- c(TRUE, FALSE, NA) # truth values
+
+list_tt <- map(c(`&`, `|`, xor),  #<<
+               ~ outer(v, v, .x)) #<<
+
+for (i in seq_along(list_tt)){
+  colnames(list_tt[[i]]) <- v
+  rownames(list_tt[[i]]) <- v
+}
+
+names(list_tt) <- c('& AND',
+                    '| OR',
+                    'XOR')
+```
+:::
+
+::: {.column}
+```{r, echo=FALSE, results='asis'}
+
+for (i in 1:3){
+print(
+  kbl(list_tt[[i]], caption=names(list_tt[i])) |>
+  kable_minimal(position = "left", full_width= FALSE) |>
+  column_spec(1, bold = T, background = "lightgray") |>
+  row_spec(0, bold = T, background = "lightgray")
+)
+  cat('<br>\n\n<!-- -->\n\n')
+}
+
+```
+
+:::
+::: 
+
+## Truth tables 
+
+|  <div style="width:80px">`and`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
+|:--|:--|:--|:--|
+|**`TRUE`**  |TRUE  |FALSE |NA    |
+|**`FALSE`** |FALSE |FALSE |FALSE |
+|**`NA`**    |NA    |FALSE |NA    |
+
+<br>
+
+|  <div style="width:80px">`or`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
+|:--|:-|:--|:-|
+|**`TRUE`**  |TRUE |TRUE  |TRUE |
+|**`FALSE`** |TRUE |FALSE |NA   |
+|**`NA`**    |TRUE |NA    |NA   |
+
+<br>
+
+|  <div style="width:80px">`xor`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
+|:--|:--|:--|:--|
+|**`TRUE`** |FALSE |TRUE  |NA |
+|**`FALSE`** |TRUE  |FALSE |NA |
+|**`NA`**   |NA    |NA    |NA |
+
+
+
+
+
+## `slice()`: choosing rows based on location
+
+::: {.columns}
+::: {.column}
+
+In base {{< fa brands r-project >}} dataframe cells can be addressed by
+indices
+
+`flights[5000:5010,seq(1, 19, by=5)]` returns rows `5000:5010` and columns
+`1, 6, 11` from dataframe `flights`
+
+This can be done in a (verbose) `dplyr` way using `slice()` and `select()`
+
+:::
+::: {.column}
+
+```{r}
+flights |>
+  slice(5001:5005) |>  #<<
+  select(seq(1, 19, by=5))
+```
+
+:::
+::: 
+
+
+{{< fa hand-point-right >}} combined with aggregation (`group_by()`) variants of `slice_` may be used 
+to perform *windowing* operations
+
+{{< fa hand-point-right >}} Useful variant `slice_sample()`
+
+
+
+
+# Joins : multi-table queries 
+
+
+::: {.callout-note}
+
+$\bowtie(R,S, {\text{condition}})$
+
+stands for
+
+> join rows/tuples of $R$ and rows/tuples of $S$  that satisfy $\text{condition}$
+
+:::
+
+
+
+
+## `nycflights` tables
+
+::: {.columns}
+::: {.column}
+The `nycflights13` package  offers five related tables:
+
+- _Fact_ tables:
+  - `flights`
+  - `weather`  (hourly weather conditions at different locations)
+
+- _Dimension_ tables:
+  - `airports`  (airports full names, location, ...)
+  - `planes`    (model, manufacturer, year, ...)
+  - `airlines`  (full names)
+
+This is an instance of a [Star Schema](https://en.wikipedia.org/wiki/Star_schema)
+
+:::
+
+::: {.column}
+![](/images/schema-nycflights.png)
+
+:::
+::: 
+
+
+
+
+## About *Star schemas*
+
+- Fact tables record measurements for a specific event
+
+- Fact tables generally consist of numeric values, and foreign keys to dimensional data where descriptive information is kept
+
+- Dimension tables record informations about entities involved in events recorded in Fact tables
+
+::: {.aside}
+
+From [Wikipedia](https://en.wikipedia.org/wiki/Star_schema)]
+
+:::
+
+
+
+## {{< fa wind >}} weather conditions
+
+
+
+```{r}
+#| eval: true
+#| output-location: column
+weather |>
+  glimpse(width = 50)
+```
+
+
+
+## Connecting `flights`  and `weather`
+
+
+We want to complement information in `flights` using data `weather`
+
+Motivation: we would like to relate delays (`arr_delay`) and weather conditions
+
+- can we explain (justify) delays using weather data?
+
+- can we predict delays using weather data?
+
+
+
+## {{< fa plane-departure >}} ⋈  {{< fa wind >}}
+
+
+
+For each flight (row in `flights`)
+
+- `year`, `month`, `day`, `hour` (computed from `time_hour`) indicate
+the approaximate time of departure
+
+- `origin` indicates the airport where the plane takes off
+
+Each row of `weather` contains corresponding information
+
+{{< fa hand-point-right >}} for each row of `flights` we look for rows of `weather`
+with matching values in `year`, `month`, `day`, `hour`  and `origin`
+
+{{< fa hand-point-right >}} NATURAL INNER JOIN between the tables
+
+
+
+## `inner_join`: natural join
+
+
+
+```{r}
+#| label: flights-weather
+#| output-location: column
+#| eval: true
+f_w <- flights |>
+  inner_join(weather) #<<
+
+f_w |> 
+  select(seq(1, 
+             ncol(f_w),
+             by=2)) |> 
+  glimpse(width=50)
+```
+
+
+
+
+
+
+
+## Join schema
+
+
+```{r, echo=FALSE}
+
+f_w |>
+  glimpse(width=50)
+```
+
+
+##
+
+The schema of the result is the union of the schemas of the operands
+
+A tuple from `flights` matches a tuple from `weather` if the tuple have the same values in the common columns:
+
+```{r}
+#| eval: true
+#| echo: false
+names(f_w)
+```
+
+
+
+## Which columns are used when joining tables $R$ and $S$?
+
+- _default behavior_ of `inner_join`: all columns shared by  $R$ and $S$. Common columns  have the same name
+in both schema. They are expected to have the same class
+
+- _manual definition_: in many settings, we  want to overrule the default behavior. We specify
+manually which column from $R$ should match which column from $S$
+
+
+
+## Natural join of  `flights`  and `weather`:
+
+```{r}
+#| eval: true
+common_names <- base::intersect(names(weather),
+                                names(flights))
+
+setequal(
+  inner_join(flights, weather),
+  inner_join(flights,
+             weather,
+             by=common_names)
+)
+```
+
+
+
+## {{< fa brain >}} Are you surprised by the next chunk?
+
+```{r}
+#| eval: true
+dtu  <- inner_join(flights,
+           weather,
+           by=c("year", "month", "day", "origin", "hour"))
+
+dtv <- inner_join(flights,
+           weather,
+           by=c("origin", "time_hour"))
+
+# setequal(dtu, dtv)
+```
+
+Recall that columns `year`, `month` `day` `hour` can be computed from  `time_hour`
+
+```{r}
+#| eval: true
+flights |>
+  filter(year!=year(time_hour) |
+         month!=month(time_hour) |
+         day!=day(time_hour) |
+         hour!=hour(time_hour)) |>
+  nrow()
+```
+
+## The two results do not have the same schema!
+
+```{r}
+#| eval: true
+setdiff(colnames(dtv), colnames(dtu))
+setdiff(colnames(dtu), colnames(dtv))
+```
+
+
+## Fixing
+
+```{r}
+#| eval: true
+dtu  <- inner_join(flights,
+           weather,
+           by=c("year", "month", "day", "origin", "hour"),
+           suffix= c("", ".y")) |>  #<<
+           select(-ends_with(".y"))  #<<
+
+dtv <- inner_join(flights,
+           weather,
+           by=c("origin", "time_hour"),
+           suffix= c("", ".y")) |>  #<<
+           select(-ends_with(".y"))  #<<
+
+setequal(dtu, dtv)
+```
+
+
+
+## About `inner_join`
+
+::: {.columns}
+::: {.column}
+
+```{.r}
+inner_join(
+  x, y,
+  by = NULL,      #<<
+  copy = FALSE,
+  suffix = c(".x", ".y"), #<<
+  ...,
+  keep = FALSE,  #<<
+  na_matches = "na")  #<<
+```
+
+:::
+::: {.column}
+- `by`:
+  - `by=c("A1", "A3", "A7")` row `r` from `R` and `s` from `S` match if `r.A1 == s.A1`,
+  `r.A3 == s.A3`,   `r.A7 == s.A7`
+  - `by=c("A1"="B", "A3"="C", "A7"="D")` row `r` from `R` and `s` from `S` match if `r.A1 == s.B`,
+  `r.A3 == s.C`,   `r.A7 == s.D`
+
+- `suffix`: If there are non-joined duplicate variables in `x` and `y`, these suffixes will be added to the output to disambiguate them.
+
+- `keep`: Should the join keys from _both_ `x` and `y` be preserved in the output?
+
+- `na_matches`: Should NA and NaN values match one another?
+
+::: {.aside}
+From online documentation
+
+:::
+
+:::
+::: 
+
+
+
+
+
+
+## Join flavors
+
+Different flavors of `join` can be used to join one table to columns from another, matching values with the rows that they correspond to
+
+Each join retains a different combination of values from the tables
+
+--
+
+- `left_join(x, y, by = NULL, suffix = c(".x", ".y"), ...)` Join matching values from `y` to `x`.
+Retain all rows of `x` padding missing values from `y` by `NA`
+
+- `semi_join` ...
+
+- `anti_join` ...
+
+
+
+
+
+## Toy examples : `inner_join`
+
+::: {.columns}
+::: {.column width="30%"}
+
+```{r zetoytables, echo=FALSE}
+#| eval: true
+R |> kable(caption="R")
+S |> kable(caption="S")
+```
+:::
+
+::: {.column}
+
+```{r, echo=FALSE}
+#| eval: true
+kable <- knitr::kable
+inner_join(S, R, by=c("E"="A1")) |> 
+  kable(caption='inner_join(S, R, by=c("E"="A1"))')
+
+```
+
+:::
+:::
+
+
+
+
+
+## Toy examples : `left_join`
+
+::: {.columns}
+::: {.column width="30%"}
+
+```{r zetoytables-out, echo=FALSE}
+<<zetoytables>>
+```
+
+:::
+
+::: {.column}
+
+```{r, echo=FALSE}
+#| eval: true
+left_join(S, R, by=c("E"="A1")) |> 
+  kable(caption='left_join(S, R, by=c("E"="A1"))')
+```
+
+:::
+:::
+
+
+
+## Toy examples : `semi_join` `anti_join`
+
+::: {.columns}
+::: {.column width="30%"}
+
+```{r zetoytables-out-2, echo=FALSE, ref.label="zetoytables"}
+<<zetoytables>>
+```
+
+:::
+
+
+::: {.column}
+
+```{r, echo=FALSE}
+semi_join(S, R, by=c("E"="A1")) |> kable(caption='semi_join(S, R, by=c("E"="A1"))')
+```
+
+<br><br>
+
+```{r, echo=FALSE}
+anti_join(S, R, by=c("E"="A1")) |> kable(caption='anti_join(S, R, by=c("E"="A1"))')
+```
+
+:::
+::: 
+
+
+
+
+## Conditional/ $\theta$ -join
+
+In relational databases, joins are not restricted to _natural joins_
+
+. . .
+
+$$U \leftarrow R \bowtie_{\theta} S$$
+
+reads as
+
+$$\begin{array}{rl}
+T & \leftarrow R \times S\\
+U & \leftarrow \sigma(T, \theta)\end{array}$$
+
+where
+
+- $R \times S$ is the _cartesian product_ of $R$ and $S$
+
+- $\theta$ is a boolean expression that can be evaluated on any tuple of $R \times S$
+
+
+
+## Do we need conditional/ $\theta$ -joins?
+
+::: {.callout-note}
+
+{{< fa hand-point-right >}}: We can implement $\theta$/conditional-joins by pipelining a cross product and a filtering
+
+:::
+
+. . .
+
+::: {.callout-caution}
+
+{{< fa skull-crossbones >}}: Cross products are costly:
+  + $\#\text{rows}(R \times S) = \#\text{rows}(R) \times \#\text{rows}(S)$
+  + $\#\text{cols}(R \times S) = \#\text{cols}(R) + \#\text{cols}(S)$
+
+:::
+
+## Do we need conditional/ $\theta$ -joins? 
+
+::: {.callout-note}
+
+{{< fa database >}}: RDBMS use query planning and optimization, indexing to circumvent the cross product bottleneck (when possible)
+
+:::
+
+. . .
+
+::: {.callout-tip}
+
+{{< fa brands r-project >}}: if we need to perform a $\theta$-join
+
+  + outsource it to a RDBMS, or
+  + design an ad hoc pipeline
+
+:::
+
+
+::: {.aside}
+
+[About conditional join](https://www.r-bloggers.com/2018/02/in-between-a-rock-and-a-conditional-join/)
+
+:::
+
+
+
+
+## A conditional join between `flights` and `weather`
+
+- The natural join between `flights` and `weather` we implemented can be regarded as an ad hoc conditional join between normalized versions of `weather` and `flights` {{< fa lightbulb >}}
+
+
+- Table `flights` and `weather` are redundant: `year`, `month`, `day`, `hour` can be computed from `time_hour`
+
+
+- Assume `flights` and `weather` are trimmed so as to become irredundant
+
+
+
+- The conditional join is then based on _truncations_ of variables `time_hour`
+
+```{.sql}
+SELECT 
+  *
+FROM 
+  flights AS f, weather AS w
+WHERE 
+  date_trunc('hour', f.time_hour) = date_trunc('hour', w.time_hour)
+```
+
+- Adding redundant columns to `flights` and `weather` allows us to transform
+a tricky conditional join into a simple natural join {{< fa champagne-glass >}}
+
+
+::: {.aside}
+
+[PostgreSQL documentation](https://www.postgresql.org/docs/14/index.html)
+
+:::
+
+
+# Creating new columns
+
+
+
+Creation of new columns may happen
+
+- on the fly
+
+- when altering (enriching) the schema of a table
+
+In databases, creation of new columns may be the result of a query or be the result of altering a table schema with `ALTER TABLE ADD COLUMN ...`
+
+In `tidyverse()` we use verbs `mutate`  or `add_column` to add columns to the input table
+
+
+
+## `mutate`
+
+::: {.columns}
+::: {.column}
+
+```{r, eval=FALSE}
+mutate(   #<<
+  .data,
+  new_col= expression, #<<
+  ...,   #<<
+  .keep = c("all", "used", "unused", "none"),
+  .before = NULL,
+  .after = NULL
+)
+```
+
+:::
+::: {.column}
+
+`.data`: the input data frame
+
+`new_col= expression`:
+
+-  `new_col` is the name of a new column
+
+-  `expression` is evaluated on each row of `.data` or it is a vector of length `1`
+
+- `all` is the default behavior, retains all columns from `.data`
+
+
+:::
+::: 
+
+
+
+
+
+## Creating a categorical column to spot large delays
+
+::: {.columns}
+::: {.column}
+
+```{r mutatis, eval=FALSE}
+breaks_delay <- with(flights,
+  c(min(arr_delay, na.rm=TRUE),
+    0, 30,
+    max(arr_delay, na.rm=TRUE)))
+
+level_delay <- c("None",
+                 "Moderate",
+                 "Large")
+
+flights |>
+  mutate(large_delay = cut(arr_delay,  #<<
+    breaks=breaks_delay, #<<
+    labels=level_delay,  #<<
+    ordered_result=TRUE)) |>   #<<
+  select(large_delay, arr_delay) |>
+  sample_n(5)
+```
+
+:::
+::: {.column}
+
+
+```{r mutatis-out, echo=FALSE, ref.label="mutatis"}
+
+```
+:::
+::: 
+
+
+##
+
+```{r}
+flights |>
+  mutate(foo = if_else(arr_time > sched_arr_time,        #<<
+                              arr_time - sched_arr_time,
+                              0L,
+                              missing = NA_integer_)) |>
+  group_by( (foo >0) & abs(foo - arr_delay)  > 100) |>
+  summarise(N=n())
+
+```
+
+
+
+
+## Changing the class of a column
+
+
+::: {.columns}
+::: {.column}
+
+```{r mutandis, eval=FALSE}
+flights |>
+  mutate(large_delay = cut(arr_delay,  #<<
+    breaks=breaks_delay,
+    labels=level_delay,
+    ordered_result=TRUE),
+    origin = as.factor(origin), #<<
+    dest = as.factor(dest)    #<<
+  ) |>
+  select(large_delay,
+    arr_delay,
+    origin,
+    dest) |>
+  sample_n(5)
+```
+
+:::
+::: {.column}
+
+```{r mutandis-out, echo=FALSE, ref.label="mutandis"}
+
+```
+:::
+::: 
+
+
+
+
+# Tidy tables
+
+
+
+
+## Tidying tables is part of data cleaning   {.smaller }
+
+> A (tidy) dataset is a collection of values, usually either numbers (if quantitative) or strings (if qualitative)
+
+> Values are organised in two ways
+
+> Every value belongs to a _variable_ and an _observation_
+
+> A _variable_ contains all values that measure the same underlying attribute (like height, temperature, duration) across _units_
+
+> An _observation_ contains all values measured on the same _unit_ (like a person, or a day, or a race) across attributes
+
+> The principles of tidy data are tied to those of relational databases and Codd's relational algebra
+
+
+::: {.aside}
+
+[{{< fa book >}} The tidy data paper](https://vita.had.co.nz/papers/tidy-data.html)
+
+:::
+
+##   {.smaller}
+
+{{< include _codds-principles.qmd >}}
+
+
+
+## {{< fa bullhorn >}}
+
+{{< fa hand-point-right >}} `dplyr` functions expect and return _tidy_ tables
+
+In a _tidy_ table
+
+- Each variable is a column
+
+- Each observation is a row
+
+- Every cell is a single value
+
+
+::: {.aside}
+[{{< fa book >}} The tidy data paper](https://vita.had.co.nz/papers/tidy-data.html)]
+:::
+
+##
+
+{{< fa hand-point-right >}} In order to tell whether a table is tidy, we need to know what is the _population_ under investigation,
+what are the observations/individuals, which measures are performed on each individual, ...
+
+
+
+## Untidy data
+
+> Column headers are values, not variable names.
+
+> Multiple variables are stored in one column.
+
+> Variables are stored in both rows and columns.
+
+> Multiple types of observational units are stored in the same table.
+
+> A single observational unit is stored in multiple tables.
+
+> ...
+
+
+{{< fa tools >}} 
+
+
+
+## Functions from `tidyr::...`
+
+- `pivot_wider` and `pivot_longer`
+
+- `separate` and  `unite`
+
+- Handling missing values with `complete`, `fill`, ...
+
+- ...
+
+[`tidyr` website](https://tidyr.tidyverse.org)
+
+
+
+
+## Pivot longer
+
+::: {.columns}
+::: {.column}
+
+> `pivot_longer()` is commonly needed to tidy wild-caught datasets as they often optimise for ease of data entry or ease of comparison rather than ease of analysis.
+
+
+```{r, echo=FALSE}
+messy <- tibble::tribble(
+~row, ~a, ~b, ~c,
+"A", 1, 4, 7,
+"B", 2, 5, 8,
+"C", 3, 6, 9,
+)
+
+messy |> kable()
+```
+
+:::
+::: {.column}
+
+```{r}
+messy |> pivot_longer(
+  cols=c(-row),  #<<
+  names_to = "name",
+  values_to = "value",
+)  |> kable()
+```
+
+:::
+::: 
+
+::: {.aside}
+
+> `pivot_longer()` makes datasets longer by increasing the number of rows and decreasing the number of columns. I don’t believe it makes sense to describe a dataset as being in “long form”. Length is a relative term, and you can only say (e.g.) that dataset A is longer than dataset B.
+
+:::
+
+## Pivot wider
+
+::: {.columns}
+::: {.column}
+
+```{.r}
+pivot_wider(  #<<
+  data,
+  id_cols = NULL, #<<
+  names_from = name, #<<
+  names_prefix = "",
+  values_from = value, #<<
+  ...
+)
+```
+{{< fa hand-point-right >}} some optional arguments are missing
+
+:::
+::: {.column}
+
+When reporting, we often use `pivot_wider` (explicitely or implicitely)
+to make results more readable, possibly to conform to a tradition
+
+- Life tables in demography and actuarial science
+- Longitudinal data
+- See slide [How many flights per day of week per departure airport?](#aggregate-pivot-wider)
+
+:::
+::: 
+
+
+# Aggregations
+
+
+
+## How many flights per carrier?
+
+::: {.columns}
+::: {.column}
+
+```{r flights_carrier, eval=FALSE}
+flights |>
+  group_by(carrier) |>  #<<
+  summarise(count=n()) |>  #<<
+  arrange(desc(count))
+```
+
+```{.sql}
+--| eval: false
+SELECT 
+  carrier, COUNT(*) AS n
+FROM 
+  flights
+GROUP BY 
+  carrier
+ORDER BY 
+  n DESCENDING
+```
+:::
+::: {.column}
+
+```{r flights_carrier-out, ref.label="flights_carrier", echo=FALSE}
+
+```
+
+:::
+::: 
+
+
+## How many flights per day of week per departure airport?  {.smaller}
+
+::: {.columns}
+::: {.column}
+```{r flights-dow, eval=FALSE, warning=F, message=F}
+flights |>
+  group_by(origin,  wday(time_hour, abbr=T, label=T)) |>  #<<
+  summarise(count=n(), .groups="drop") |>       #<<
+  rename(day_of_week=`wday(time_hour, abbr = T, label = T)`) |>
+  pivot_wider(  #<<
+    id_cols="origin",   #<<
+    names_from="day_of_week", #<<
+    values_from="count") |>  #<<
+  kable(caption="Departures per day")
+```
+
+::: 
+
+
+::: {.column}
+
+
+```{r flights-dow-out, eval=FALSE, echo=FALSE, ref.label="flights-dow"}
+
+```
+
+:::
+::: 
+
+# Window queries 
+
+
+
+## Window queries 
+
+TODO
+
+
+
+## Partitionning and Ordering
+
+
+TODO
+
+
+
+## Sliding windows and package `slider`
+
+TODO
+
+
+
+
+# Pipelines/chaining operations
+
+
+
+## `|>`, `%>%` and other pipes
+
+> All `dplyr` functions take a table as the first argument
+
+> Rather than forcing the user to either save intermediate objects or nest functions, `dplyr` provides the `|>` operator from `magrittr`
+
+> `x |> f(y)` turns into `f(x, y)`
+
+> The result from one step is  _piped_ into the next step
+
+> Use `|>`  to rewrite multiple operations that you can read left-to-right/top-to-bottom
+
+```{r, eval=FALSE}
+g(f(x, y), z)
+
+x |>
+  f(y) |>
+  g(z)
+```
+
+::: {.aside}
+
+From [dplyr vignette](https://dplyr.tidyverse.org/articles/dplyr.html)
+
+:::
+
+
+
+
+## Magrittr `%>%`
+
+::: {.columns}
+::: {.column}
+
+- `%>%` is not tied to `dplyr`
+- `%>%` can be used with packages from `tidyverse`
+- `%>%` can be used outside `tidyverse` that is with functions which take a table (or something else) as a second, third or keyword argument
+
+{{< fa magic >}} Use pronoun `.` to denote the LHS of the pipe expression
+
+:::
+
+::: {.column}
+
+Second argument of `g` has the same type as the result of `f`
+
+```{r, eval=FALSE}
+g(z, f(x, y))
+
+x %>%
+  f(y) %>%
+  g(z, .)   #<<
+```
+
+`x %>% f(y)` is a shorthand for `x %>% f(., y)`
+
+:::
+::: 
+
+
+
+
+
+## Standard pipe `|>` (version > 4.)
+
+As of version 4.1 (2021), base {{< fa brands r-project >}} offers a pipe operator denoted by `|>`
+
+::: {.columns}
+::: {.column}
+
+`x |> f(y)` turns into `f(x, y)`
+
+
+```{r, eval=FALSE}
+g(f(x, y), z)
+
+x |>
+  f(y) |>
+  g(z)
+```
+:::
+::: {.column}
+
+{{< fa hand-point-right >}} the standard pipe `|>` has no pronoun/placeholder to denote the LHS of the pipe expression
+
+The roundabout consists in using another new construct `\(x)`
+
+```{r, eval=FALSE}
+g(z, w)
+
+x |>
+  (\(x) g(z, w=x))()
+```
+
+```{r}
+"une" |>
+  (\(x) str_c("ceci n'est pas", x, sep=" "))() |>
+  str_c("pipe", sep=" ") |>
+  cat()
+```
+:::
+::: 
+
+
+::: {.aside}
+
+See [Blog on the new standard pipe](https://www.r-bloggers.com/2021/05/the-new-r-pipe/)]
+
+:::
+
+## Other pipes
+
+`Magrittr` offers several variants of `|>`
+
+- Tee operator `%T>%`
+- Assignement pipe `%<>%`
+- Exposition operator `%$%`
+- ...  
+
+See [pipes for beginners](https://www.r-bloggers.com/2017/12/pipes-in-r-tutorial-for-beginners/)
+
+
+{{< fa exclamation-triangle >}} Base {{< fa brands r-project >}}  has a `pipe()` function  to manipulate connections (Files, URLs, ...)
+
+
+
+## {{< fa book-reader >}} References
+
+- [R for Data Science](https://r4ds.had.co.nz)
+  + [Data transformation](https://r4ds.had.co.nz/transform.html)
+- Rstudio cheat sheets
+  + [dplyr](https://www.rstudio.com/resources/cheatsheets/)
+  + [tidyr](https://www.rstudio.com/resources/cheatsheets/)
+  + [datatable](https://www.rstudio.com/resources/cheatsheets/)
+  + [readr](https://www.rstudio.com/resources/cheatsheets/)
+
+
+
+
+
+
+
+
+
+
+# The End 
