@@ -347,6 +347,7 @@ A projection is parametrized by a list of column names
 
 ```{r, echo=FALSE}
 #| eval: true
+#| label: iframe-tidyverse
 knitr::include_url("https://dplyr.tidyverse.org")
 ```
 
@@ -410,7 +411,9 @@ And
 ::: {.column}
 
 ```{r, echo=FALSE}
-knitr::include_url("https://www.tidyverse.org")
+#| eval: true
+<<iframe-tidyverse>>
+# knitr::include_url("https://www.tidyverse.org")
 ```
 
 :::
@@ -423,13 +426,13 @@ knitr::include_url("https://www.tidyverse.org")
 
 $\pi(R, \underbrace{A_1, \ldots, A_3}_{\text{column names}})$
 
-```{r, eval=FALSE}
+```{.r}
 select(R, A1, A3) #<<
 ```
 
 or,  equivalently
 
-```{r, eval=FALSE}
+```{.r}
 R |> select(A1, A3) #<<
 ```
 
@@ -542,19 +545,18 @@ flights |>
 
 A more readable equivalent of
 
-```{r, eval=FALSE}
-head(select(flights,
-            origin,
-            dest),
-     10)
+```{.r}
+head(select(flights, origin, dest), 10)
 ```
+
+or 
 
 ```{.sql}
 SELECT 
   origin, dest
 FROM 
   flights
-LIMIT 10;
+LIMIT 6;
 ```
 
 
@@ -684,7 +686,7 @@ NA | TRUE
 
 
 
-## Truth tables for three-valued logic
+## Truth tables for three-valued logic  {.smaller}
 
 ::: {.columns}
 ::: {.column}
@@ -695,6 +697,7 @@ NA | TRUE
 
 ```{r}
 #| echo: true
+#| eval: true
 v <- c(TRUE, FALSE, NA) # truth values
 
 list_tt <- map(c(`&`, `|`, xor),  #<<
@@ -706,14 +709,21 @@ for (i in seq_along(list_tt)){
 }
 
 names(list_tt) <- c('& AND',
-                    '| OR',
+                    'OR',
                     'XOR')
 ```
 :::
 
-::: {.column}
-```{r, echo=FALSE, results='asis'}
+::: {.column width="10%"}
 
+:::
+
+::: {.column width="40%"}
+```{r}
+#| eval: true
+#| echo: false
+#| results: asis
+#| 
 for (i in 1:3){
 print(
   kbl(list_tt[[i]], caption=names(list_tt[i])) |>
@@ -729,29 +739,6 @@ print(
 :::
 ::: 
 
-## Truth tables 
-
-|  <div style="width:80px">`and`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
-|:--|:--|:--|:--|
-|**`TRUE`**  |TRUE  |FALSE |NA    |
-|**`FALSE`** |FALSE |FALSE |FALSE |
-|**`NA`**    |NA    |FALSE |NA    |
-
-<br>
-
-|  <div style="width:80px">`or`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
-|:--|:-|:--|:-|
-|**`TRUE`**  |TRUE |TRUE  |TRUE |
-|**`FALSE`** |TRUE |FALSE |NA   |
-|**`NA`**    |TRUE |NA    |NA   |
-
-<br>
-
-|  <div style="width:80px">`xor`</div> | <div style="width:80px">`TRUE`</div>  | <div style="width:80px">`FALSE`</div> |<div style="width:80px">`NA`</div>    |
-|:--|:--|:--|:--|
-|**`TRUE`** |FALSE |TRUE  |NA |
-|**`FALSE`** |TRUE  |FALSE |NA |
-|**`NA`**   |NA    |NA    |NA |
 
 
 
@@ -774,6 +761,7 @@ This can be done in a (verbose) `dplyr` way using `slice()` and `select()`
 ::: {.column}
 
 ```{r}
+#| eval: true
 flights |>
   slice(5001:5005) |>  #<<
   select(seq(1, 19, by=5))
@@ -927,7 +915,7 @@ f_w |>
 
 
 ```{r, echo=FALSE}
-
+#| eval: true
 f_w |>
   glimpse(width=50)
 ```
@@ -1128,7 +1116,8 @@ inner_join(S, R, by=c("E"="A1")) |>
 
 ```{r zetoytables-out, echo=FALSE}
 #| eval: true
-<<zetoytables>>
+#| ref-label: zetoytables
+# <<zetoytables>>
 ```
 
 :::
@@ -1189,17 +1178,13 @@ $$U \leftarrow R \bowtie_{\theta} S$$
 
 reads as
 
-$$\begin{array}{rl}
-T & \leftarrow R \times S\\
-U & \leftarrow \sigma(T, \theta)\end{array}$$
+$$\begin{array}{rl} T & \leftarrow R \times S\\ U & \leftarrow \sigma(T, \theta)\end{array}$$
 
 where
 
 - $R \times S$ is the _cartesian product_ of $R$ and $S$
 
 - $\theta$ is a boolean expression that can be evaluated on any tuple of $R \times S$
-
-
 
 ## Do we need conditional/ $\theta$ -joins?
 
@@ -1305,7 +1290,7 @@ In `tidyverse()` we use verbs `mutate`  or `add_column` to add columns to the in
 ::: {.columns}
 ::: {.column}
 
-```{r, eval=FALSE}
+```{.r}
 mutate(   #<<
   .data,
   new_col= expression, #<<
@@ -1400,7 +1385,8 @@ flights |>
     origin = as.factor(origin), #<<
     dest = as.factor(dest)    #<<
   ) |>
-  select(large_delay,
+  select(
+    large_delay,
     arr_delay,
     origin,
     dest) |>
@@ -1437,11 +1423,8 @@ flights |>
 
 :::
 
-##   {.smaller}
+##  Codd's principles  {.smaller}
 
-
-
-::: {.callout-important title="Codd's Principles"}
 
 
 1. Information is represented logically in *tables*
@@ -1463,7 +1446,6 @@ where or how the physical data is distributed and should not require
 alteration if the physical data is centralized or distributed
 1.  Any *row processing* done in the system must obey the same *integrity rules* and *constraints* that set-processing operations do
 
-:::
 
 
 
@@ -1526,34 +1508,43 @@ what are the observations/individuals, which measures are performed on each indi
 
 
 
-## Pivot longer
+## Pivot longer  {.smaller}
 
 ::: {.columns}
-::: {.column}
+::: {.column width="30%"}
 
-> `pivot_longer()` is commonly needed to tidy wild-caught datasets as they often optimise for ease of data entry or ease of comparison rather than ease of analysis.
+`pivot_longer()` is commonly needed to tidy wild-caught datasets as they often optimise for ease of data entry or ease of comparison rather than ease of analysis.
 
+:::
 
-```{r, echo=FALSE}
+::: {.column width="70%"}
+
+```{r}
+#| eval: true
+#| echo: true
+#| output-location: column
+
 messy <- tibble::tribble(
-~row, ~a, ~b, ~c,
-"A", 1, 4, 7,
-"B", 2, 5, 8,
-"C", 3, 6, 9,
+  ~row, ~a, ~b, ~c,
+  "A", 1, 4, 7,
+  "B", 2, 5, 8,
+  "C", 3, 6, 9,
 )
-
 messy |> kable()
 ```
 
-:::
-::: {.column}
-
 ```{r}
-messy |> pivot_longer(
-  cols=c(-row),  #<<
-  names_to = "name",
-  values_to = "value",
-)  |> kable()
+#| eval: true
+#| echo: true
+#| output-location: column
+messy_long <- messy |> 
+  pivot_longer(
+    cols=c(-row),  #<<
+    names_to = "name",
+    values_to = "value")
+  
+messy_long  |> 
+  kable()
 ```
 
 :::
@@ -1596,6 +1587,23 @@ to make results more readable, possibly to conform to a tradition
 ::: 
 
 
+## `pivot_wider()` in action
+
+
+```{r}
+#| eval: true
+#| echo: true
+#| output-location: column
+
+messy_long |>
+  pivot_wider( 
+  id_cols = c("row"), #<<
+  names_from = name, #<<
+  names_prefix = "",
+  values_from = value
+)
+```
+
 # Aggregations  {background-color="#1c191c"}
 
 
@@ -1614,7 +1622,6 @@ flights |>
 ```
 
 ```{.sql}
---| eval: false
 SELECT 
   carrier, COUNT(*) AS n
 FROM 
@@ -1653,21 +1660,56 @@ flights |>
 
 ## Window queries 
 
-TODO
+Assume we want to answer the question: for each day of week (Monday, Tuesday, ...), what are the five carriers that experience the largest average delay?
 
+```{r}
+#| eval: true
+#| echo: true
+#| output-location: column
 
+flights |>
+  group_by(weekdays(time_hour), carrier) |>
+  summarise(avg_dep_delay=mean(dep_delay, na.rm=T)) |>
+  slice_max(n=2, order_by=avg_dep_delay)
+```
 
-## Partitionning and Ordering
+## The SQL way {.smaller}
 
+```{.sql}
+WITH R AS (
+  SELECT 
+    EXTRACT(dow FROM time_hour) AS day_of_week,
+    carrier,
+    AVG(dep_delay) AS avg_dep_delay
+  FROM 
+    flights
+  GROUP BY 
+    EXTRACT(dow FROM time_hour), carrier
+), S AS (
+  SELECT 
+    day_of_week,
+    carrier,
+    rank() OVER (PARTITION by day_of_week ORDER BY avg_dep_delay DESC) AS rnk
+  FROM 
+    R
+)
 
-TODO
+SELECT 
+  day_of_week, 
+  carrier, 
+  rnk
+FROM 
+  S
+WHERE 
+  rnk <= 10 ;
+```
+
 
 
 
 ## Sliding windows and package `slider`
 
 TODO
-
 
 
 

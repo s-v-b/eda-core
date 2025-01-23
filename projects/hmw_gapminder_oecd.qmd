@@ -101,6 +101,14 @@ You shall also give the code of the graphical pipelines in the appendix.
 
 You shall avoid copy-paste coding. Don't Repeat Yourself. The `tidyverse` is your friend. `knitr` provide the tools to organize the Quarto file so that you can write your code once and use it many times, once for data wrangling and plotting (without echoing), then for listing and explanation.
 
+::: {.callout-tip}
+
+### Tip for organizing the report 
+
+Look at [fake report](/core/projects/fake_report.qmd) organized along this principles. Note that works with the `knitr` engine.
+
+:::
+
 
 ## {{< fa graduation-cap >}} Grading criteria
 

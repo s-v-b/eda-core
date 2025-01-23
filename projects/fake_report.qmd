@@ -1,0 +1,158 @@
+---
+title: "LAB: Fake report"
+format:
+  html:
+    output-file: fake-report.html
+
+execute: 
+  eval: true
+  echo: false
+  collapse: false
+
+code-tools: 
+  source: repo
+
+params:
+  truc: html
+  year: 2023 
+  curriculum: "M1 MIDS & MFA"
+  university: "Université Paris Cité"
+  homepage: "https://stephane-v-boucheron.fr/courses/isidata"
+  moodle: ""
+
+engine: knitr
+---
+
+
+
+```{r}
+#| label: none
+#| message: false 
+#| warning: false
+require(tidyverse)
+require(glue)
+```
+
+
+# Motivation
+
+```{r}
+#| label: lorem
+lorem::ipsum()
+
+```
+
+
+# 200 countries, 50 years, 20 lines of code
+
+
+```{r}
+#| ref.label: lorem
+```
+
+```{r}
+#| label: load_gapminder 
+gapminder <- gapminder::gapminder
+
+gapminder |>
+    head() |>
+    knitr::kable()
+
+```
+
+
+```{r}
+#| label: theme_scale
+#| appendix: true
+neat_color_scale <-
+      c("Africa" = "#01d4e5",
+        "Americas" = "#7dea01" ,
+        "Asia" = "#fc5173",
+        "Europe" = "#fde803",
+        "Oceania" = "#536227")
+```
+
+
+```{r}
+#| ref.label: lorem
+```
+
+```{r}
+#| label: visualize_static_gapminder 
+#| appendix: true
+a_year <- sample(gapminder$year, 1)
+
+p <- gapminder |>
+    filter(year==a_year) |>
+    ggplot() +
+    aes(x = gdpPercap) +
+    aes(y = lifeExp) +
+    aes(size = pop) +
+    aes(text = country) +                   #
+    aes(fill = continent) +
+    aes(color= continent) +
+    aes(frame = year) +                     #
+    geom_point(alpha=.5) +
+    scale_x_log10() +
+    scale_size_area(max_size = 15,
+                    labels= scales::label_number(scale=1/1e6,
+                                                suffix=" M")) +
+    scale_fill_manual(values = neat_color_scale) +
+    labs(title= glue("Gapminder  {a_year}"),
+        x = "Yearly Income per Capita",
+        y = "Life Expectancy",
+        caption="From sick  and poor (bottom left) to healthy and rich (top right)")
+
+p 
+
+```
+
+# Static with plotly 
+
+```{r}
+#| ref.label: lorem
+```
+
+```{r}
+#| label: static-plotly
+#| appendix: true
+(p + theme(legend.position = "none")) |> 
+    plotly::ggplotly(height = 500, width=750)
+
+```
+
+
+# Wizardry
+
+
+```{r}
+#| ref.label: lorem
+```
+
+```{r}
+#| label: animated 
+#| appendix: true
+
+(p %+% 
+    gapminder + 
+    theme(legend.position = "none") +
+    ggtitle("Gapminder")) |> 
+    plotly::ggplotly(height = 500, width=750)
+
+```
+
+
+# Appendix 
+
+```{r}
+#| ref.label: lorem
+```
+
+
+```{r}
+#| label: chunk-make-appendix
+#| ref.label: !expr knitr::all_labels(appendix==TRUE)
+#| echo: true
+#| eval: false
+#| code-fold: false
+```
