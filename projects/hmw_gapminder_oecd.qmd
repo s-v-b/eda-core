@@ -107,6 +107,10 @@ You shall avoid copy-paste coding. Don't Repeat Yourself. The `tidyverse` is you
 
 Look at [fake report](/core/projects/fake_report.qmd) organized along this principles. Note that works with the `knitr` engine.
 
+Have a look at [Rmarkdown the definitive guide](https://bookdown.org/yihui/rmarkdown/) to leanr about `knitr` tricks.
+
+This trick is described in [Section 4.19](https://bookdown.org/yihui/rmarkdown-cookbook/code-appendix.html)
+
 :::
 
 
