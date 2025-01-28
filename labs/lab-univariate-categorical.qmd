@@ -1,0 +1,1069 @@
+---
+title: 'Univariate Categorical Analysis'
+date: "`r Sys.time()`"
+
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+
+format:
+  html:
+    output-file: lab-univariate-categorical.html
+  pdf:
+    output-file: lab-univariate-categorical.pdf
+
+engine: knitr
+
+---
+
+{{< include _preamble.qmd >}}
+
+::: {.callout-important}
+
+### Objectives
+
+In Exploratory analysis of tabular data, univariate analysis is the first step. It consists in exploring, summarizing, visualizing columns of a dataset.
+
+In this Lab, we describe univariate categorical analysis
+
+:::
+
+::: {.callout-note collapse="true"}
+
+Try to load (potentially) useful packages in a chunk at the beginning of your file.
+
+```{r setup-packages}
+#| warning: false
+#| message: false
+#| code-fold: true
+#| collapse: true
+
+to_be_loaded <- c(
+  "tidyverse", 
+  "lobstr", 
+  "ggforce",
+  "patchwork", 
+  "glue",
+  "magrittr",
+  "gt",
+  "DT", 
+  "lobstr",
+  "kableExtra",
+  "viridis"
+)
+
+purrr::map_lgl(
+  to_be_loaded,
+  \(x) require(x,
+    character.only = T,
+    quietly = T)
+  )
+```
+
+Set the (graphical) theme
+
+```{r}
+old_theme <- theme_set(theme_minimal())
+```
+
+:::
+
+
+::: {.callout-tip}
+
+In this lab, we load the data from the hard drive. The data are read from some file located 
+in our tree of directories. Loading requires the determination of the correct filepath. 
+This filepath is often a *relative filepath*, it is relative to the directory where the `R` session/the `R` script has been launched. Base `R` offers functions that can help you to find your way the directories tree. 
+
+
+```{r}
+#| eval: true
+#| collapse: true
+getwd() # Where are we? 
+head(list.files())  # List the files in the current directory
+head(list.dirs())   # List sub-directories
+```
+
+{{< fa hand-point-right >}} Package `here` for navigating the working tree.
+
+:::
+
+
+# Objectives
+
+In this lab, we introduce univariate analysis for *categorical* variables.
+
+This amounts to exploring, summarizing, visualizing *categorical* columns of a dataset.
+
+This also often involves table wrangling: retyping some columns, relabelling, reordering, lumping levels of *factors*, that is factor re-engineering. 
+
+Summarizing univariate categorical samples amounts to counting the number of occurrences of levels in the sample. 
+
+Visualizing categorical samples starts with
+
+- `Bar plots`
+- `Column plots`
+
+This exploratory work seldom makes it to the final report. Nevertheless, it has to be done in an efficient, reproducible way. 
+
+This is an opportunity to revisit the DRY principle. 
+
+At the end, we shall see that `skimr::skim()` can be very helpful. 
+
+# Dataset  Recensement 
+
+Have a look at the text file. Choose a loading function 
+for each format. `Rstudio` IDE provides a valuable helper. 
+
+Load the data into the session environment and call it `df`.
+
+::: {.callout-note}
+
+### Question
+
+Create if it does not already exist, a subdirectory `DATA` in your working directory. 
+
+:::
+
+::: {.callout-tip}
+
+The `fs` package contains a number of useful functions for handling files and directories with a consistent API. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-tip  title="Solution"}
+
+
+```{r}
+#| eval: true
+#| echo: true
+#| collapse: true
+if (!fs::dir_exists('./DATA')) {
+  fs::dir_create('./DATA')
+}
+```
+
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Download file `Recensement` from URL `https://stephane-v-boucheron.fr/data/Recensement.csv`.  Base function `download.file()` is enough.
+
+:::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| message: false
+download.file('https://stephane-v-boucheron.fr/data/Recensement.csv', 
+              "./DATA/Recensement.csv")
+df <- readr::read_table("./DATA/Recensement.csv")    # check that the path is correct
+```
+
+Have a glimpse at the dataframe
+
+```{r}
+#| eval: true
+#| collapse: true
+df %>% 
+  glimpse()
+```
+
+:::
+
+:::::
+
+# Column (re)coding
+
+
+In order to understand the role of each column, have a look at the following coding tables.
+
+- `SEXE`
+  + F: Female
+  + M: Male
+- `REGION`
+  + NE: North-East
+  + W: West
+  + S: South
+  + NW: North-West
+- `STAT_MARI`
+  + C  (Unmarried) 
+  + M  (Married)
+  + D  (Divorced)
+  + S  (Separated)
+  + V  (Widowed)
+- `SYNDICAT`:
+  + "non": not affiliated with any Labour Union
+  + "oui": affiliated with a Labour Union
+- `CATEGORIE`: Professional activity
+  + 1: Business, Management and Finance
+  + 2: Liberal professions
+  + 3: Services
+  + 4: Selling
+  + 5: Administration
+  + 6: Agriculture, Fishing, Forestry
+  + 7: Building
+  + 8: Repair and maintenance
+  + 9: Production
+  + 10: Commodities Transportation
+- `NIV_ETUDES`: Education level
+  + 32: at most 4 years schooling
+  + 33: between 5 and 6 years schooling
+  + 34: between 7 and 8 years schooling
+  + 35: 9 years schooling
+  + 36: 10 years schooling
+  + 37: 11 years schooling
+  + 38: 12 years schooling, dropping out from High School without a diploma
+  + 39: 12 years schooling, with High School diploma
+  + 40: College education with no diploma
+  + 41: [Associate degree](https://en.wikipedia.org/wiki/Associate_degree), vocational.  Earned in two years or more
+  + 42: [Associate degree](https://en.wikipedia.org/wiki/Associate_degree), academic. Earned in two years or more
+  + 43: [Bachelor](https://en.wikipedia.org/wiki/Bachelor%27s_degree)
+  + 44: [Master](https://en.wikipedia.org/wiki/Master%27s_degree)
+  + 45: Specific School Diploma
+  + 46: [PhD](https://en.wikipedia.org/wiki/Doctor_of_Philosophy)
+- `REV_FOYER` : Classes of annual household income in dollars.
+- `NB_PERS` : Number of people in the household.
+- `NB_ENF` : Number of children in the household.
+
+# Handling factors
+
+
+We build lookup tables to incorporate the above information.
+In `R`, named vectors are convenient.
+
+```{r}
+#| include: true
+#| code-fold: true
+#| label: cat_lookup
+category_lookup = c(
+  "1"= "Business, Management and Finance",
+  "2"= "Liberal profession",
+  "3"= "Services",
+  "4"= "Selling",
+  "5"= "Administration",
+  "6"= "Agriculture, Fishing, Forestry",
+  "7"= "Building ",
+  "8"= "Repair and maintenance",
+  "9"= "Production",
+  "10"= "Commodities Transport"
+)
+
+# code_category <- as_tibble() %>% rownames_to_column() %>% rename(code = rowname, name=value)
+```
+
+In the next chunk, the named vectors are turned into two-columns dataframes (tibbles).
+
+```{r}
+#| code-fold: true
+vector2tibble <- function(v) { 
+  tibble(name=v, code= names(v))
+} 
+```
+
+```{r}
+code_category <- category_lookup %>%
+  vector2tibble()
+
+code_category
+```
+
+::: {.callout-note collapse="true"}
+
+Using the `magrittr` pipe `%>%`, the function `vector2tibble` could have been defined using the  concise piping notation. Then `.` serves as a *pronoun*.  
+
+```{.r}
+vector2tibble <- . %>% 
+  tibble(name=., code= names(.))  # The lhs of the pipe is used twice.
+```
+
+
+Note the use of `.` as pronoun for the function argument. 
+
+This construction is useful for turning a pipeline into a univariate function. 
+
+
+The function `vector2tibble` could also be defined by binding 
+identifier `vector2tibble` with an *anonymous function*. 
+
+```{r}
+#| eval: false
+#| 
+vector2tibble <- \(v) tibble(name=v, code= names(v)) 
+```
+
+
+:::
+
+
+```{r}
+#| code-fold: true
+#| label: edu_lookup
+#| collapse: true
+education_lookup = c(
+  "32"= "<= 4 years schooling",
+  "33"= "between 5 and 6 years",
+  "34"= "between 7 and 8 years",
+  "35"= "9 years schooling",
+  "36"= "10 years schooling",
+  "37"= "11 years schooling",
+  "38"= "12 years schooling, no diploma",
+  "39"= "12 years schooling, HS diploma",
+  "40"= "College without diploma",
+  "41"= "Associate degree, vocational",
+  "42"= "Associate degree, academic",
+  "43"= "Bachelor",
+  "44"= "Master",
+  "45"= "Specific School Diploma",
+  "46"= "PhD"
+)
+
+code_education <- vector2tibble(education_lookup)
+  
+```
+
+```{r}
+#| code-fold: true
+#| label: stat_lookup
+#| collapse: true
+status_lookup <- c(
+  "C"="Single", 
+  "M"="Maried",
+  "V"="Widowed",
+  "D"="Divorced",
+  "S"="Separated"
+)
+
+code_status <- status_lookup %>% 
+  vector2tibble()
+```
+
+```{r}
+#| label: breaks_revenue
+#| code-fold: true
+breaks_revenue <-c(
+  0,
+  5000,  
+  7500, 
+  10000, 
+  12500, 
+  15000, 
+  17500, 
+  20000,
+  25000, 
+  30000, 
+  35000, 
+  40000,
+  50000, 
+  60000, 
+  75000, 
+  100000, 
+  150000
+)
+```
+
+# Table wrangling
+
+::: {.callout-note title="Question"}
+
+Which columns should be considered as categorical/factor?
+
+:::
+
+::: {.callout-tip collapse="false"}
+
+Deciding which variables are categorical sometimes requires judgement. 
+
+Let us attempt to base the decision on a checkable criterion: determine 
+the number of distinct values in each column, consider those columns with less 
+than 20 distinct values as factors. 
+
+We can find the names of the columns with few unique values by iterating over the column names.
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+We already designed a pipeline to determine which columns should be transformed 
+into a `factor` (categorized). In the next chunk, we turn the pipeline into a univariate function
+named  `to_be_categorized` with one argument (the dataframe) 
+
+
+```{r}
+to_be_categorized  <- . %>% 
+  summarise(across(everything(), n_distinct)) %>% 
+  pivot_longer(cols = everything(), values_to = c("n_levels")) %>% 
+  filter(n_levels < 20) %>% 
+  arrange(n_levels) %>% 
+  pull(name)
+```
+
+`to_be_categorized` can be used like a function.
+
+```{r}
+#| collapse: true
+to_be_categorized
+```
+
+
+```{r}
+tbc <- to_be_categorized(df)
+
+tbc
+```
+
+:::
+
+:::::
+
+::: {.callout-note}
+
+Note that columns `NB_PERS` and `NB_ENF` have few unique values and nevertheless we could consider them as quantitative. 
+
+:::
+
+::: {.callout-note title="Question"}
+
+Coerce the relevant columns as factors. 
+
+:::
+
+
+::: {.callout-tip}
+
+
+Use `dplyr` and `forcats` verbs to perform  this coercion. 
+
+Use the `across()` construct so as to perform  a kind if *tidy selection* (as with `select`) with verb `mutate`. 
+
+You may use `forcats::as_factor()` to transform columns when needed. 
+
+Verb `dplyr::mutate` is a convenient way to modify a dataframe. 
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+We can repeat the categorization step used in the preceding lab.
+```{r}
+df %>% 
+  mutate(across(all_of(tbc), as_factor)) %>% 
+  glimpse()
+```
+
+{{< fa hand-point-right >}} What is the meaning of `all_of(tbc)`?
+
+
+The pronoun mechanism that comes with the pipe `%>%` offers a alternative:
+
+```{r}
+df <- df %>% 
+  mutate(across(all_of(to_be_categorized(.)), as_factor)) 
+  
+df  %>% 
+  glimpse()
+```
+
+The dot `.` in `all_of(to_be_categorized(.))` refers to the left-hand side of `%>%`. 
+
+:::
+
+:::::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+Evaluation of `pull(to_be_categorized, name)` returns a 
+character vector containing the names of the columns to be categorized. `all_of()` enables `mutate` to perform `as_factor()` on  each of these columns and to bind the column names to the transformed columns. 
+
+:::
+
+:::::
+
+::: {.callout-note title="Question"}
+
+Relabel the levels of `REV_FOYER` using the breaks.
+
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+We first built readable labels for `REV_FOYER`. As each level of `REV_FOYER` corresponds to an interval, we use 
+intervals as labels. 
+
+
+```{r}
+income_slices <- levels(df$REV_FOYER)
+
+l <- length(breaks_revenue)
+
+names(income_slices) <- paste(
+  "[",
+  breaks_revenue[-l], 
+  "-", 
+  lead(breaks_revenue)[-l], 
+  ")",
+  sep=""
+)
+```
+
+{{< fa hand-point-right >}} What does `lead()` do?
+
+```{r}
+df <- df %>% 
+  mutate(REV_FOYER=forcats::fct_recode(REV_FOYER, !!!income_slices)) 
+
+df %>% 
+  relocate(REV_FOYER) %>% 
+  head()
+```
+
+::: {.callout-note}
+
+Note the use of `!!!` (bang-bang-bang) to unpack the named vector `income_slices`. The  bang-bang-bang device  is offered by `rlang`, a package from `tidyverse`. It provides a very handy way of calling functions like `fct_recode` that take an unbounded  list of key-values pairs as argument. This is very much like handling keyword arguments in Python using  dictionary unpacking. 
+
+:::
+
+:::
+
+:::::
+
+Relabel the levels of the different factors so as to make the data more readbale
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+df %>% 
+  select(where(is.factor)) %>%
+  head()
+```
+
+The columns that call for relabelling the levels are:
+
+- `CATEGORIE`
+- `NIV_ETUDES`
+
+:::
+
+:::::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+lookup_category <- code_category$code
+names(lookup_category) <- code_category$name
+
+lookup_niv_etudes <- code_education$code
+names(lookup_niv_etudes) <- code_education$name
+
+df <- df %>% 
+  mutate(CATEGORIE=forcats::fct_recode(CATEGORIE, !!!lookup_category)) %>%
+  mutate(NIV_ETUDES=forcats::fct_recode(NIV_ETUDES, !!!lookup_niv_etudes)) 
+  
+df %>%
+  head()
+```
+
+{{< fa hand-point-right >}} We should be able to DRY this. 
+
+
+```{r}
+# TODO
+```
+
+:::
+
+:::::
+
+
+# Search for missing data  (optional)
+
+::: {.callout-note title="Question"}
+
+Check whether some columns contain missing data (use `is.na`).
+
+:::
+
+::: {.callout-tip}
+Useful functions:
+
+- `dplyr::summarise`
+- `across`
+- `tidyr::pivot_longer`
+- `dplyr::arrange`
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+df %>% 
+  is.na() %>% 
+  as_tibble %>% 
+  summarise(across(everything(), sum))  %>%
+  kable()
+
+```
+
+:::
+
+:::::
+
+
+# Summarizing categorical data
+
+## Counting
+
+::: {.callout-note title="Question"} 
+
+Use `table`, `prop.table` from base `R`  to compute the frequencies and proportions
+of the different levels. In statistics, the result of `table()` is a (one-way) _contingency table_.
+
+:::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+
+```{r}
+df |>
+  pull(REV_FOYER) |>
+  table()
+```
+
+```{r}
+df |>
+  count(REV_FOYER)
+```
+  
+:::
+
+:::::
+
+What is the *class* of the *object* generated by `table`? Is it a `vector`, a `list`, a `matrix`, an `array` ? 
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+ta <- df %>% 
+  pull(REV_FOYER) %>% 
+  table() 
+
+l <- list(
+  is.vector=is.vector, 
+  is.list=is.list, 
+  is.matrix=is.matrix, 
+  is.array=is.array
+)
+
+map_lgl(l, ~ .x(ta))
+```
+  
+:::
+
+:::::
+
+
+::: {.callout-note}
+
+`as.data.frame()` (or `as_tibble`) can transform a `table` object into a dataframe.
+
+```{r}
+ta <-  rename(as.data.frame(ta), REV_FOYER=`.`)
+
+ta
+```
+
+:::
+
+
+You may use `knitr::kabble()`, possibly `knitr::kable(., format="markdown")` to tweak the output.
+
+If you are more ambitious, use `gt::...`.
+
+In order to feed `ggplot` with a contingency table, 
+it is useful to build contingency tables as dataframes. 
+Use `dplyr::count()` to do this. 
+
+
+::: {.callout-tip}
+
+`skimr::skim()` allows us to perform univariate categorical analysis all at once.
+
+```{r}
+#| code-fold: show
+df %>% 
+  skimr::skim(where(is.factor)) %>% 
+  print(n=50)
+```
+
+The output can be tailored to your specific objectives and fed to functions that are geared to displaying large tables
+(see packages `knitr`, `DT`, and `gt`)
+
+:::
+
+# Save the (polished) data
+
+Saving polished data in self-documented formats can be time-saving. 
+Base `R` offers the `.RDS` format
+
+```{r}
+#| eval: false
+df %>% 
+  saveRDS("./DATA/Recensement.RDS")
+```
+
+By saving into this format we can persist our work. 
+
+```{r}
+#| eval: false
+dt <-  readRDS("./DATA/Recensement.RDS")
+
+dt %>% 
+  glimpse()
+```
+
+Compare the size of `csv` and `RDS` files.
+
+
+# Plotting
+
+Plot the counts, first for column `SEXE`
+
+We shall use `barplots` to visualize counts.
+
+*barplot* belongs to the bar graphs family. 
+
+Build a barplot to visualize the distribution of the `SEXE` column. 
+
+Use 
+
+- `geom_bar` (working directly with the data)
+- `geom_col` (working with a contingency table)
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+  
+
+```{r}
+(
+  df %>% 
+    ggplot() +
+    aes(x=SEXE) +
+    geom_bar() +
+    ggtitle("With geom_bar")) + (
+  df %>% 
+    count(SEXE) %>% 
+    ggplot() +
+    aes(x=SEXE, y=n) +
+    geom_col() +
+    ggtitle("With geom_col")
+  ) 
+  
+```
+
+:::
+
+:::::
+
+
+When investigating relations between categerical columns we will often rely on `mosaicplot()`. Indeed, `barplot` and `mosaicplot` belong to the collection of area plots that are used to visualize counts (statistical summaries for categorical variables).
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+mosaicplot(~ SEXE, df)
+```
+
+:::
+
+:::::
+
+# Repeat the same operation for each qualitative variable (DRY)
+
+
+## Using a `for` loop
+
+
+We have to build a barplot for each categorical variable. Here, we just have nine of them. We could do this using cut and paste, and some editing. In doing so, we would not comply with the DRY (Don't Repeat Yourself) principle. 
+
+In order to remain DRY, we will attempt to abstract the recipe we used to build our first barplot. 
+
+This recipe is pretty simple:
+
+1. Build a `ggplot` object with `df` as the data layer.
+2. Add an aesthetic mapping a categorical column to axis `x`
+3. Add a geometry using `geom_bar`
+4. Add labels explaining the reader which column is under scrutiny
+
+We first need to gather the names of the categorical columns. The following chunk does this in a simple way. 
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+
+col_names <- df %>% 
+  select(where(is.factor))%>%
+  names()
+```
+
+:::
+
+:::::
+
+In the next chunk, we shall build a named list of `ggplot` objects consisting of barplots. The for loop body is almost 
+obtained by  cutting and pasting the recipe for the first barplot. 
+
+
+::: {.callout-tip}
+
+Note an important difference: instead of something `aes(x=col)` where `col`  denotes a column in the dataframe, we shall write 
+`aes(x=.data[[col]])` where `col` is a string that matches a column name. Writing `aes(x=col)` would not work. 
+
+The loop variable `col` iterates over the column names, not over the  columns themselves. 
+
+When using `ggplot` in interactive computations, we write  `aes(x=col)`, and, under the hood, the interpreter 
+uses the *tidy evaluation* mechanism that underpins `R` to map `df$col` to the `x` axis. 
+
+`ggplot` functions like `aes()` use *data masking*  to alleviate the burden of the working Statistician.  
+
+Within the context of `ggplot` programming, pronoun `.data` refers to the data layer of the graphical object. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+list_plots <- list()
+
+for (col in col_names){
+  p <- df %>% 
+  ggplot() +
+  aes(x=.data[[col]]) +     # mind the .data pronoun
+  geom_bar() +
+  labs(
+    title="Census data",
+    subtitle = col
+  )
+
+  list_plots[[col]] <- p  # add the ggplot object to the list
+} 
+```
+
+:::
+
+:::::
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+Inspect the individual plots.
+```{r}
+#| collapse: true
+p_temp <- list_plots[["REV_FOYER"]] +
+  aes(x=forcats::fct_infreq(.data[["REV_FOYER"]]))
+
+p_temp
+```
+
+:::
+
+:::::
+
+
+If the labels on the x-axis are not readable, we need to tweak them.
+This amounts to modifying the `theme` layer in the `ggplot` object, 
+and more specifically the `axis.text.x` attribute. 
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+p_temp +
+  theme(axis.text.x = element_text(angle = 45)) 
+```
+
+:::
+
+:::::
+
+
+## Using functional programming (`lapply`, `purrr::...`)
+
+Another way to compute the list of graphical objects replaces the `for` loop by calling a functional programming tool. This mechanism relies on the fact that in `R`, functions are first-class objects. 
+
+
+::: {.callout-tip}
+
+Package `purrr` offers a large range of tools with a clean API. Base `R` offers `lapply()`.
+
+:::
+
+
+We shall first define a function that takes as arguments a datafame, a column name, and a title.  We do not perform any defensive programming. Call your function `foo`.
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+foo <- function(df, col, .title= "WE NEED A TITLE!!!"){
+  p <- df %>% 
+  ggplot() +
+  aes(x=fct_infreq(.data[[col]])) +
+  geom_bar() +
+  labs(
+    title=.title,
+    subtitle = col
+  ) +
+  theme(axis.text.x = element_text(angle = 45)) 
+  return(p)
+}
+```
+
+:::
+
+:::::
+
+
+Functional programmming makes code easier to understand. 
+
+Use `foo`, `lapply` or `purrr::map()` to build 
+the list of graphical objects. 
+
+With `purrr::map()`, you may use either a formula or an anonymous function. With `lapply` use an anonymous function.
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+ll <- map(col_names, ~ foo(df, .x, "Census data"))
+```
+
+:::
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+```{r}
+#| eval: false
+
+map(col_names, \(x) foo(df, x, "Census data"))
+```
+
+:::
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| eval: false
+
+lapply(col_names, \(x)  foo(df, x, "Census data"))
+```
+
+:::
+
+:::::
+
+
+
+
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+This is essentially like executing 
+
+
+```{r}
+#| eval: false
+ll <- list()
+
+for (.x in col_names){
+  ll[[.x]] <- foo(df, .x, "Census data")
+}
+```
+
+:::
+
+:::::
+
+
+Package `patchwork` offers functions for displaying collections of related plots. 
+
+::::: {.content-visible when-profile="solution"}
+
+::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+patchwork::wrap_plots(ll, ncol=3)
+```
+
+
+:::
+
+:::::
+
+
+# Useful links
+
+
+- [dplyr](https://gplot2.tidyverse.org)
+- [ggplot2](https://ggplot2.tidyverse.org)
+- [*R Graphic Cookbook*. Winston Chang. O' Reilly.](https://r-graphics.org)
+- [A blog on ggplot objects](https://www.data-imaginist.com/2017/Beneath-the-canvas/)
+- [`skimr`](https://cran.r-project.org/web/packages/skimr/vignettes/skimr.html)
+- [rmarkdown](bookdown.org/yihui/rmarkdown)
+- [quarto](https://quarto.org/docs/guide/)
