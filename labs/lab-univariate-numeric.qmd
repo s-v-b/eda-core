@@ -1,0 +1,787 @@
+---
+title: 'LAB: Univariate analysis'
+date: "`r Sys.time()`"
+draft: false 
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+format:
+  html:
+    output-file: lab-univariate-numeric.html
+  pdf:
+    output-file: lab-univariate-numeric.pdf
+
+
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+
+# Univariate numerical samples
+
+```{r setup-packages}
+#| warning: false
+#| message: false
+#| collapse: true
+#| label: setup
+#| 
+to_be_loaded <- c("tidyverse", 
+                  "magrittr",
+                  "skimr",
+                  "lobstr"
+)
+
+for (pck in to_be_loaded) {
+  if (!require(pck, character.only = T)) {
+    pak::pkg_install(pck) # ,,    repos="http://cran.rstudio.com/")
+    stopifnot(require(pck, character.only = T))
+  }  
+}
+```
+
+
+
+
+
+# Objectives
+
+In Exploratory analysis of tabular data, univariate analysis is the first step. It consists in exploring, summarizing, visualizing columns of a dataset.
+
+In common circumstances, table wrangling is a prerequisite.   
+
+Then, univariate techniques depend on the kind of columns we are facing.
+
+
+For *numerical* samples/columns, to name a few:
+
+- Boxplots
+- Histograms
+- Density plots
+- CDF
+- Quantile functions
+- Miscellanea
+
+For categorical samples/columns, we have: 
+
+- Bar plots
+- Column plots
+
+
+# Dataset
+
+
+> Since 1948, the US Census Bureau  carries out a monthly Current Population Survey, 
+collecting data concerning residents aged above 15  from $150 000$ households. 
+This survey is one of the most important sources of information concerning the american workforce. Data reported in file `Recensement.txt`  originate from the 2012 census. 
+
+In this lab, we investigate the numerical colums of the dataset.
+
+
+After downloading, dataset `Recensement` can be found in file `Recensement.csv`.
+
+Choose a loading function  for the format. `Rstudio` IDE provides a valuable helper. 
+
+Load the data into the session environment and call it `df`.
+
+```{r}
+#| eval: true
+#| echo: true
+#| include: false
+#| label: explore-dir
+list.dirs()
+list.files()
+getwd()
+```
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="Solution" collapse="true"}
+
+```{r}
+#| mesage: false
+#| collapse: true
+#| label: data-load
+#| 
+df <- readr::read_table("./DATA/Recensement.csv")
+
+df %>% 
+  glimpse()
+```
+
+:::::
+
+:::
+
+# Table wrangling
+
+::: {.callout-note title="Question"}
+
+Which columns should be considered as categorical/factor?
+
+:::
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+Deciding which variables are categorical sometimes requires judgement. 
+
+Let us attempt to base the decision on a checkable criterion: determine  the number of distinct values in each column, consider those columns with less than 20 distinct values as factors. 
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: to-be-categorized
+to_be_categorized  <- df %>% 
+  summarise(across(everything(), n_distinct)) %>% 
+  pivot_longer(cols = everything(), 
+               # names_to = "nom_colonne",
+               values_to = c("n_levels")) %>% 
+  filter(n_levels < 20) %>% 
+  arrange(n_levels) 
+
+to_be_categorized
+
+to_be_categorized %>% 
+  pull(name)
+```
+
+Columns `NB_PERS` and `NB_ENF` have few unique values and nevertheless we could consider them as quantitative. 
+
+:::::
+
+:::
+
+Coerce the relevant columns as factors. 
+
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+We could proceed by iteration over the relevant columns. We 
+use `lobstr::...` to monitor the copy on modify process. 
+
+```{r}
+#| label: lobstr
+lobstr::obj_addr(df)
+lobstr::ref(df)
+
+df_copy <- df 
+
+lobstr::ref(df_copy)
+
+for (cl in pull(to_be_categorized,name)) {
+  df_copy[[cl]] <- as_factor(df_copy[[cl]])
+}
+
+lobstr::obj_addr(df_copy)
+foo <- lobstr::ref(df_copy)
+```
+
+:::
+
+::::: {.callout-note title="solution (cont'd)" collapse="true"}
+ 
+We will kill several birds with one stone.
+
+`across()` allows us to  pick  the columns to be categorized, to 
+apply `as_factor()` to each of them, and to replace the old column 
+by the result of `as_factor(....)`  
+
+```{r}
+#| collapse: true
+#| label: tidy-selet-mutate
+df_cp <- df %>% 
+  mutate(across(all_of(pull(to_be_categorized, name)), as_factor))
+
+lobstr::ref(df_cp)
+
+df %>% 
+  glimpse()  
+```
+
+We could do this using the WET approach 
+
+```{r}
+#| eval: false
+#| label: wet
+df_wet <- df %>% 
+  mutate(SEXE = as_factor(SEXE), 
+         SYNDICAT = as_factor(SYNDICAT), 
+         REGION = as_factor(REGION), 
+         STAT_MARI = as_factor(STAT_MARI), 
+         NB_ENF = as_factor(NB_ENF), 
+         NB_PERS = as_factor(NB_PERS), 
+         CATEGORIE = as_factor(CATEGORIE),
+         NIV_ETUDES = as_factor(NIV_ETUDES), 
+         REV_FOYER = as_factor(REV_FOYER)
+  ) 
+
+df_wet %>% 
+  glimpse()
+```
+
+
+{{< fa hand-point-right >}} Compare `pull`  and `pluck`
+
+:::::
+
+:::
+
+
+# Search for missing data  (optional)
+
+::: {.callout-note title="Question"}
+
+Check whether some columns contain missing data (use `is.na`).
+
+:::
+
+::: {.callout-tip}
+
+Useful functions:
+
+- `dplyr::summarise_all`
+- `tidyr::pivot_longer`
+- `dplyr::arrange`
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: kable-summarise
+df %>% 
+  is.na() %>% 
+  as_tibble %>% 
+  summarise(across(everything(), sum))  %>%
+  knitr::kable()
+```
+
+or 
+
+```{r}
+#| label: anonymnous-function
+df %>% 
+  summarise(across(everything(), \(x) sum(is.na(x)))) 
+```
+
+or 
+
+```{r}
+#| label: formulae
+df %>% 
+  summarise(across(everything(), ~ sum(is.na(.)))) 
+```
+
+Note the different ways of introduction anonymous functions.
+
+:::::
+
+:::
+
+
+# Analysis of column `AGE`
+
+## Numerical summary 
+
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="false"}
+
+```{r}
+#| label: summary-age
+df %>% 
+    pull(AGE) %>% 
+    summary()
+
+sd(df$AGE) ; IQR(df$AGE) ; mad(df$AGE)
+```
+
+:::::
+
+:::
+
+Use `skimr::skim()` 
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: skim-age
+df %>% 
+    pull(AGE) %>% 
+    skimr::skim()
+```
+
+```{r}
+#| label: milk-skim
+skm <- df %>% 
+  skimr::skim(AGE)
+
+class(skm)
+
+attributes(skm)
+
+tibble::as_tibble(skm)
+```
+
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Compare `mean` and `median`, `sd`  and `IQR`. 
+
+Are mean and median systematically related?
+
+:::
+
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+Ask chatgpt.
+
+There is at least one relation between median and mean for square-integrable distributoins:
+$$|\text{Median} - \text{Mean}| \leq \text{sd}$$
+Lévy's inequality.
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Are standard deviation and IQR systematically related ?
+
+:::
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+Ask chatgpt.
+
+Yes. 
+
+:::::
+
+:::
+
+## Boxplots
+
+::: {.callout-note title="Question"}
+
+Draw a boxplot of the Age distribution 
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: boxplot-age
+df |> 
+    ggplot() +
+    aes(x=1L, y=AGE) +
+    geom_boxplot() +
+    labs(
+        title="Age distribution",
+        subtitle = "Census data"
+    )
+```
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+How would you get rid of the useless ticks on the x-axis? 
+
+:::
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+Ask chatgpt.
+
+Yes. 
+
+:::::
+
+:::
+
+## Histograms
+
+::: {.callout-note title="Question"}
+
+Plot a _histogram_ of the empirical distribution of the `AGE` column
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: histogram-age
+p <- df |> 
+  ggplot() +
+  aes(x=AGE) +
+  labs(
+    title = "Age distribution",
+    subtitle = "Census data",
+    x = "Age (Years)",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+p +
+  geom_histogram(aes(y=after_stat(density)),
+                 bins=15,
+                 fill="white",
+                 color="black") +
+  labs(
+    caption = "Histogram"
+  )
+
+```
+
+
+
+
+:::::
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+Try different values for the `bins` parameter of `geom_histogram()`
+
+:::
+
+## Density estimates
+
+::: {.callout-note title="Question"}
+
+Plot a _density_ estimate of the `AGE` column (use `stat_density`.
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: age-density
+p +
+  stat_density(
+              fill="white",
+              color="black") +
+  labs(
+    caption = "Kernel Density Estimate"
+  )
+```
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Play with parameters `bw`, `kernel` and `adjust`.
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+Overlay the two plots  (histogram and density).
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: age-density-histogram
+p +
+  stat_density(
+              fill="white",
+              color="black") +
+  geom_histogram(aes(y=after_stat(density)),
+                 bins=15,
+                 fill="white",
+                 color="black",
+                 alpha=.5) +
+  labs(
+    caption = "Overlayed Density Estimates"
+  )
+```
+
+:::::
+
+:::
+
+
+## ECDF 
+
+::: {.callout-note title="Question"}
+
+Plot the Empirical CDF of the AGE distribution 
+
+:::
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: age-ecdf
+p +
+    stat_ecdf()  +
+    labs(
+        caption = "Empirical CDF"
+  )
+```
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Can you read the quartiles from the ECDF pplot?
+
+:::
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+Of course. Yes, we can.
+
+:::::
+
+:::
+
+## Quantile function 
+
+::: {.callout-note title="Question"}
+
+Plot the quantile function of the AGE distribution. 
+
+:::
+
+# Repeat the analysis for `SAL_HOR`
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: salaire-generic
+p <- df %>% 
+  ggplot() +
+  aes(x=SAL_HOR) +
+  labs(
+    title = "Wage distribution",
+    subtitle = "Census data",
+    x = "Hourly wage",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+
+
+```{r}
+#| label: sal-hor-histo  
+p +
+  geom_histogram(aes(y=after_stat(density)),
+                 bins=15,
+                 fill="white",
+                 color="black") +
+  labs(
+    caption = "Histogram"
+  )
+```
+
+:::::
+
+:::
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+```{r}
+#| label: sal-hor-density-histo
+p +
+  stat_density(
+              fill="white",
+              color="black") +
+  geom_histogram(aes(y=after_stat(density)),
+                 bins=15,
+                 fill="white",
+                 color="black",
+                 alpha=.5) +
+  labs(
+    caption = "Overlayed Density Estimates"
+  )
+```
+
+```{r}
+#| label: truc
+truc <- rlang::expr({fill=alpha("white",.5)})
+
+p <- df |> 
+  ggplot() +
+  aes(x=SAL_HOR, y=after_stat(density)) +
+  labs(
+    title = "Wage distribution",
+    subtitle = "Census data",
+    x = "Hourly wage",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: overlayed-densities
+p + 
+  stat_density(fill=alpha("grey", 0.5), color="black") +
+  geom_histogram(fill=alpha("grey", 0.5), color="black", bins=15) +
+  labs(
+    caption = "Overlayed Density Estimates"
+  )
+```
+
+
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+How could you comply with the DRY principle ?
+
+:::
+
+::: {.content-visible when-profile="solution" collapse="true"}
+
+::::: {.callout-note title="solution" collapse="true"}
+
+This amounts to [programming with `ggplot2`](https://ggplot2-book.org/programming) function. This is not straightforward since `ggplot2` relies on data masking. 
+
+> A major requirement of a good data analysis is flexibility. If your data changes, or you discover something that makes you rethink your basic assumptions, you need to be able to easily change many plots at once. The main inhibitor of flexibility is code duplication. If you have the same plotting statement repeated over and over again, you’ll have to make the same change in many different places. Often just the thought of making all those changes is exhausting! This chapter will help you overcome that problem by showing you how to program with ggplot2.
+
+> To make your code more flexible, you need to reduce duplicated code by writing functions. When you notice you’re doing the same thing over and over again, think about how you might generalise it and turn it into a function. If you’re not that familiar with how functions work in R, you might want to brush up your knowledge at https://adv-r.hadley.nz/functions.html. 
+
+From [Hadley Wickham](https://ggplot2-book.org/programming)
+
+:::
+
+
+
+::::: {.callout-note title="solution" collapse="true"}
+
+An attempt: 
+
+
+```{r}
+getwd()
+fs::dir_exists('UTILS')
+```
+
+
+```{r}
+#| label: load-make_biotiful
+#| file: "UTILS/make_biotiful.R"
+#| echo: true
+#| eval: true
+
+```
+
+
+```{r}
+#| label: use-make-biotiful
+#| eval: true
+mp <- df_cp |> 
+  make_biotifoul(is.numeric) + 
+  theme_minimal()
+
+mp
+```
+
+:::::
+
+
+::::: {.callout-note title="solution" collapse="true"}
+
+Another attempt
+
+```{r}
+##| file: "UTILS/my_histo.R"
+#| echo: true
+#| eval: true
+```
+
+
+```{r}
+#| eval: false
+list_plots <- df_cp |> 
+  select(where(is.numeric)) |> 
+  colnames() |> 
+  map(rlang::parse_expr) |>
+  map (\(x) my_histo(df, {{x}}))
+
+patchwork::wrap_plots(list_plots)
+```
+
+
+
+:::::
+
+:::
+
+
+# {{< fa book >}} Useful links
+
+- [veridical data science](https://vdsbook.com)
+- [quarto](https://quarto.org)
+- [rmarkdown](bookdown.org/yihui/rmarkdown)
+- [dplyr](https://gplot2.tidyverse.org)
+- [ggplot2](https://ggplot2.tidyverse.org)
+- *R Graphic Cookbook*. Winston Chang. O' Reilly.
+- [A blog on ggplot object](https://www.data-imaginist.com/2017/Beneath-the-canvas/)
+- [`skimr`]()
+ 
