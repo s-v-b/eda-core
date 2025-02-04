@@ -1,0 +1,118 @@
+Once again we rely on the `Recensement` dataset.
+
+> Since 1948, the US Census Bureau  carries out a monthly Current Population Survey,  collecting data concerning residents aged above 15  from $150 000$ households.  This survey is one of the most important sources of information concerning the american workforce. Data reported in file `Recensement.txt`  originate from the 2012 census. 
+
+Load the data into the session environment and call it `df`. Take advantage 
+of the fact that we saved the result of our data wrangling job in a self-documented file format. Download a `parquet` file from the following URL: 
+
+`https://stephane-v-boucheron.fr/data/Recensement.parquet`
+
+
+
+::: {.callout-note title="Question"}
+
+Download a `parquet` file from the following URL: 
+
+`https://stephane-v-boucheron.fr/data/Recensement.parquet`
+
+:::
+
+::: {.callout-tip}
+
+- Use `httr::GET()` and `WriteBin()`
+- Use `download.file()`
+- Use `fs` to handle files and directories
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-tip title="Solution" collapse="true"}
+
+#### Manage the `DATA` sub-directory
+
+```{r}
+#| echo: true
+
+if (fs::dir_exists('DATA')){
+  datapath <- "DATA"
+} else {
+  datapath <- "../DATA"
+}
+```
+
+#### Using `httr::get` and `writeBin`
+
+```{r}
+#| label: httr
+fname <- "Recensement.parquet"
+
+fpath <- paste(datapath, fname, sep="/")
+
+url <- 'https://stephane-v-boucheron.fr/data/Recensement.parquet'
+
+if (!file.exists(fpath)) {
+  tryCatch(
+    expr = { 
+    
+      rep <- httr::GET(url)
+      stopifnot(rep$status_code==200)
+    
+      con <- file(fpath, open="wb")
+      writeBin(rep$content, con)
+      close(con)
+    }, 
+    warning = function(w) {
+      glue("Successful download but {w}")
+    }, 
+    error = function(e) {
+      stop("Houston, we have a problem!")    # error-handler-code
+    }, 
+    finally = {
+      if (exists("con") && isOpen(con)){
+        close(con)
+      }
+    } 
+  )
+} 
+```
+
+```{r}
+#| label: download-file
+if (!file.exists(fpath)) {
+  tryCatch(
+    expr = {
+      download.file(url, fpath, mode="wb", quiet=T)
+      print(glue::glue('>>> file downloaded at {fpath}\n'))
+    }, 
+    warning = function(w) {
+      glue::glue("Successful download but {w}")
+    }, 
+    error = function(e) {
+      stop("Houston, we have a problem!")    # error-handler-code
+    } 
+  )
+}
+```
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Load the data contained in the downloaded file into the session environment and call it `df`
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title="Solution"}
+
+```{r}
+df <- arrow::read_parquet(fpath)
+```
+
+::: 
+ 
+:::

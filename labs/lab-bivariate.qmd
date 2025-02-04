@@ -44,7 +44,6 @@ In Exploratory analysis of tabular data, bivariate analysis is the second step. 
 #| message: false
 #| collapse: true
 stopifnot(
-  require(tidyverse), 
   require(glue),
   require(magrittr),
   require(lobstr),
@@ -53,15 +52,23 @@ stopifnot(
   require(vcd),
   require(ggmosaic),
   require(httr),
-  require(patchwork)
-)
+  require(patchwork),
+  require(corrr),
+  require(gapminder),
+  require(slider),
+  require(tidyverse) 
+) 
 
 ```
 
 
+```{r}
+#| echo: false
+#| eval: true
+old_theme <- theme_set(theme_minimal())
+```
 
 Bivariate techniques depend on the types of columns we are facing.
-
 
 For *numerical/numerical* samples 
 
@@ -76,73 +83,15 @@ For *numerical/categorical* samples
 - Boxplots per group
 - Histograms per group
 - Density plots per group
-- Quantile-Quantile plots
+
 
 
 # Dataset
 
-Once again we rely on the Census dataset.
 
-> Since 1948, the US Census Bureau  carries out a monthly Current Population Survey,  collecting data concerning residents aged above 15  from $150 000$ households.  This survey is one of the most important sources of information concerning the american workforce. Data reported in file `Recensement.txt`  originate from the 2012 census. 
-
-Load the data into the session environment and call it `df`. Take advantage 
-of the fact that we saved the result of our data wrangling job in a self-documented file format. Download a `parquet` file from the following URL: 
-
-`https://stephane-v-boucheron.fr/data/Recensement.parquet`
-
-::: {.callout-tip}
-
-Use `httr::GET()` and `WriteBin()`. 
-
-:::
-
-::: {.content-visible when-profile="solution"}
-
-::::: {.callout-note title="Solution" collapse="true"}
+{{< include _recensement.qmd >}}
 
 
-
-
-```{r}
-#| echo: false
-
-if (fs::dir_exists('DATA')){
-  datapath <- "DATA"
-} else {
-  datapath <- "../DATA"
-}
-```
-
-
-```{r}
-fname <- "Recensement.parquet"
-
-fpath <- paste(datapath, fname, sep="/")
-
-if (!file.exists(fpath)) {
-  tryCatch(expr = { 
-    url <- 'https://stephane-v-boucheron.fr/data/Recensement.parquet'
-
-    rep <- httr::GET(url)
-    stopifnot(rep$status_code==200)
-    
-    con <- file(fpath, open="wb")
-    writeBin(rep$content, con)
-    close(con)
-  }, warning = function(w) {
-    glue("Successful download but {w}")
-  }, error = function(e) {
-    stop("Houston, we have a problem!")    # error-handler-code
-  }, finally = {
-    if (exists("con") && isOpen(con)){
-      close(con)
-    }
-  } 
-  )
-} 
-
-df <- arrow::read_parquet(fpath)
-```
 
 
 
@@ -158,25 +107,45 @@ df |>
   head()
 ```
 
-:::::
-
-:::
 
 # Categorical/Categorical pairs
 
 
+::: {.callout-note title="Question"}
+
+Project the dataframe on categorical columns
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
 ```{r}
+#| label: tidy-select-factor
 df |> 
   select(where(is.factor)) |>
   head()
 ```
 
-Explore the connection between `CATEGORIE` and `SEX`. 
-Compute the 2-ways contingency table using `table()`, and  `count()` from `dplyr`. 
+::: 
+ 
+:::
 
-Use `tibble::as_tibble()` to transform the output of `table()` into a dataframe/tibble.
+::: {.callout-note title="Question"}
 
-Use `tidyr::pivot_wider()` so as to obtain a wide (but messy) tibble with the same the same shape as the output of `table()`. Can you spot a difference? 
+- Explore the connection between `CATEGORIE` and `SEX`. 
+- Compute the 2-ways contingency table using `table()`, and  `count()` from `dplyr`. 
+
+:::
+
+::: {.callout-tip}
+
+- Use `tibble::as_tibble()` to transform the output of `table()` into a dataframe/tibble.
+- Use `tidyr::pivot_wider()` so as to obtain a wide (but messy) tibble with the same the same shape as the output of `table()`. 
+- Can you spot a difference? 
+
+:::
 
 ::: {.content-visible when-profile="solution"}  
 
@@ -184,6 +153,7 @@ Use `tidyr::pivot_wider()` so as to obtain a wide (but messy) tibble with the sa
 
 
 ```{r}
+#| label: good-old-table
 tb <- df |>
   dplyr::select(CATEGORIE, SEXE) |>
   table() 
@@ -193,6 +163,7 @@ tb <- df |>
 
 
 ```{r}
+#| label: long-contingency-table
 tb2 <- df |>
   count(CATEGORIE, SEXE)
 
@@ -202,6 +173,7 @@ tb2
 
 
 ```{r}
+#| label: pivot-long-2way-table
 tb2 |> 
   pivot_wider(id_cols=CATEGORIE, 
               names_from=SEXE, 
@@ -213,13 +185,18 @@ tb2 |>
 
 :::
 
+::: {.callout-note title="Question"}
+
 Use `mosaicplot()` from base `R` to visualize the contingency table. 
+
+:::
 
 ::::: {.content-visible when-profile="solution"}  
 
 ::: {.callout-tip}
 
 ```{r}
+#| label: mosaics
 mosaicplot(~ CATEGORIE + SEXE, 
            tb, 
            main="Données Recensement")
@@ -231,16 +208,21 @@ mosaicplot(~ SEXE + CATEGORIE, tb)
 
 :::::
 
+::: {.callout-note title="Question"}
+
 Use `geom_mosaic` from `ggmosaic` to visualize the contingency table
 
 - Make the plot as readable as possible
 - Reorder `CATEGORIE` acccording to counts
+
+:::
 
 ::::: {.content-visible when-profile="solution"}  
 
 ::: {.callout-tip}
 
 ```{r}
+#| label: rotation-label-trick
 #| warning: true
 #| eval: true
 rot_x_text <- theme(
@@ -254,21 +236,24 @@ df |>
   geom_mosaic(aes(x=product(SEXE, CATEGORIE), fill=SEXE)) +
   rot_x_text  
 ```
-
-
 :::
 
 :::::
 
+::: {.callout-note title="Question"}
+
 - Collapse rare levels of `CATEGORIE` (consider that a level 
 is rare if it has less than 40 occurrences). Use tools from `forcats`. 
+
+:::
   
 ::::: {.content-visible when-profile="solution"}  
   
 ::: {.callout-tip title="Solution"}
  
  
-```{r}  
+```{r}
+
 df |> 
   count(CATEGORIE) |> 
   arrange(desc(n))
@@ -281,6 +266,8 @@ rare_categories
 ```
 
 ```{r}
+#| label: lump-rare-categories
+#| 
 df <- df |> 
   mutate(CATEGORIE=fct_lump_min(CATEGORIE, 
                                 min=40, 
@@ -304,11 +291,19 @@ mosaicplot(~ CATEGORIE + SEXE, df)
   
 :::::
 
+
+::: {.callout-note title="Question"}
+
+Same as above with `vcd::mosaic`
+
+:::
+
 ::::: {.content-visible when-profile="solution"}  
 
-::: {.callout-tip}
+::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: vcd-mosaic
 vcd::mosaic(formula=SEXE~CATEGORIE,
             data=table(select(df, CATEGORIE, SEXE)))
 ```
@@ -317,11 +312,25 @@ vcd::mosaic(formula=SEXE~CATEGORIE,
 
 :::::
 
+
+
+
 # Testing association
 
 
 ## Chi-square independence/association test 
 
+
+[https://statsfonda.github.io/site/content/ch4_2.html#test-dindépendance](https://statsfonda.github.io/site/content/ch4_2.html#test-dindépendance)
+
+
+
+::: {.callout-note title="Question"}
+
+- Compute the chi-square association statistic between `CATEGORIE` and `SEXE`. 
+- Display the output of `chisq.test()` as a table, using `broom::tidy()`
+
+:::
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -346,7 +355,11 @@ test_1 |>
 
 :::
 
-The Chi-square statistics can be computed from the contingeny table 
+::: {.callout-note title="Question"}
+
+Compute the Chi-square statistics from the contingeny table 
+
+:::
 
 ::: {.callout-tip}
 
@@ -372,7 +385,11 @@ expected |>
 
 ## Grouped boxplots 
 
+::: {.callout-note title="Question"}
+
 Plot boxplots of `AGE` according to `NIV_ETUDES`
+
+:::
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -385,6 +402,7 @@ df |>
   geom_boxplot() +
   rot_x_text
 ```
+
 ```{r}
 df |>
   ggplot() +
@@ -396,7 +414,13 @@ df |>
 
 :::::
 
+
+::: {.callout-note title="Question"}
+
 Draw density plots of `AGE`, facet by `NIV_ETUDES` and `SEXE`
+
+:::
+
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -417,19 +441,24 @@ p
 
 :::::
 
+
+::: {.callout-note title="Question"}
+
 Collapse rare levels of `NIV_ETUDES` and replay.
+
+:::
+
 
 ::::: {.content-visible when-profile="solution"}  
 
 ::: {.callout-tip}
 
 ```{r}
-p %+% (df |> 
-  mutate(NIV_ETUDES = fct_lump_min(NIV_ETUDES, min=30)) )
+p %+% (
+  df |> 
+    mutate(NIV_ETUDES = fct_lump_min(NIV_ETUDES, min=30)) 
+)
 ```
-
-
-
 :::
 
 :::::
@@ -439,7 +468,12 @@ p %+% (df |>
 
 ## Scatterplots
 
+
+::: {.callout-note title="Question"}
+
 Make a scatterplot of `SAL_HOR`with respect to `AGE`
+
+:::
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -451,29 +485,263 @@ df |>
   aes(x=AGE, y=SAL_HOR, color=SEXE) +
   geom_point(alpha=.7)
 ```
-
-
 :::
 
 
 :::::
 
 
-## Correlations
+# Correlations
 
-- Linear correlation coefficient (Pearson $\rho$)
-- Linear rank correlation coefficient (Spearman, Kendall)
-- $\xi$ rank correlation coefficient (Chatterjee)
+- Linear correlation coefficient (Pearson)
+- Linear rank correlation coefficient (Spearman $ρ$, Kendall $τ$)
+- $ξ$ rank correlation coefficient (Chatterjee)
+
+## Linear correlation coefficient 
+
+::: {.callout-note title="Question"}
+
+Compute the Pearson, Spearman and Kendall correlation coefficients between `AGE` and `SAL_HOR` using 
+function `cor()` from base `R`
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+::: {.callout-tip title="Solution"}
+
+```{r}
+df |>
+  summarise(
+    pearson=cor(AGE, SAL_HOR), 
+    spearman=cor(AGE, SAL_HOR, method = "spearman"),
+    kendall=cor(AGE, SAL_HOR, method="kendall")) |> 
+  gt::gt() |>
+  gt::fmt_number(decimals=2) |>
+  gt::tab_caption(
+    "Correlation coefficients between SAL_HOR and AGE\nRecensement dataset"
+    )
+```
+
+
+::: 
+
+:::
+
+## Rank based methods 
+
+Spearman’s rho (𝜌) and Kendall’s tau (𝜏) are both non-parametric correlation coefficients used to measure the strength and direction of a *monotonic* relationship between two variables. 
+
+Spearman’s rho (𝜌)
+: Based on *rank differences*.<br>
+Defined as the *Pearson correlation coefficient* between the *ranked variables*.<br>
+$$\rho = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)}$$
+where $d_i$ is the difference between the ranks of each pair, and $n$ is the number of observations.
+
+Kendall’s tau (𝜏)
+: Based on *concordant and discordant pairs*. <br>
+Measures the *proportion of pairs that have the same order* in both variables compared to the total number of pairs. <br>
+$$\tau = \frac{(C - D)}{\frac{1}{2} n (n - 1)}$$
+where $C$ is the number of *concordant pairs*, and $D$ is the number of *discordant pairs*.
+
+
+### When to Use Which?
+
+| Factor | Spearman’s rho (𝜌) | Kendall’s tau (𝜏) |
+|--------|----------------|----------------|
+| Large differences in ranks | More sensitive | Less sensitive |
+| Small sample sizes | Less reliable | More reliable |
+| Outlier resistance | Moderate | High |
+| Computational efficiency | Faster | Slower (due to pairwise comparisons) |
+| Interpretation | Similar to Pearson’s correlation | More intuitive (proportion of concordance) |
+
+
+
+## Chatterjee's correlation coefficient (Chatterjee's $ξ$)
+
+> The three most popular classical measures of statistical association are
+Pearson’s correlation coefficient, Spearman’s ρ, and Kendall’s τ . These coefficients are very powerful for detecting linear or monotone associations, and
+they have well-developed asymptotic theories for calculating P-values. However, the big problem is that they are not effective for detecting associations
+that are not monotonic, even in the complete absence of noise.
+
+> Let $(X, Y)$ be a pair of random variables, where $Y$ is not a constant.
+Let $(X_1 , Y_1 ), \ldots, (X_n , Y_n )$ be i.i.d. pairs with the same law as $(X, Y)$, where
+$n ≥ 2$. The new coefficient has a simpler formula if the $X_i$’s and the $Y_i$ ’s
+have no ties. This simpler formula is presented first, and then the general
+case is given. Suppose that the $X_i$’s and the $Y_i$ ’s have no ties. Rearrange
+the data as $(X_{(1)} , Y_{(1)} ), . . . , (X_{(n)} , Y_{(n)} )$ such that $X_{(1)} ≤ · · · ≤ X_{(n)}$ . Since
+the $X_i$’s have no ties, there is a unique way of doing this. Let ri be the rank
+of $Y_{(i)}$, that is, the number of $j$ such that $Y_{(j)} ≤ Y_{(i)}$. The new correlation
+coefficient is defined as
+
+$$ξ_n(X, Y ) := 1 −  3\sum_{i=1}^{n-1} \frac{|r_{i+1} − r_i|}{n^2-1}$$
+
+> In the presence of ties, $ξ_n$ is defined as follows. If there are ties among the
+$X_i$’s, then choose an increasing rearrangement as above by breaking ties
+uniformly at random. Let $r_i$ be as before, and additionally define $l_i$ to be
+the number of $j$ such that $Y_{(j)} ≥ Y_{(i)}$. Then define
+
+$$ξ_n(X, Y ) := 1 −  3n\sum_{i=1}^{n-1} \frac{|r_{i+1} − r_i|}{2 \sum_{i=1}^n l_i (n − l_i )}$$
+
+> When there are no ties among the $Y_i$ ’s, $l_1 , \ldots , l_n$ is just a permutation of
+$1, \ldots , n$, and so the denominator in the above expression is just $n(n^2 − 1)/3$,
+which reduces this definition to the earlier expression.
+
+From [Sourav Chatterjee: A new correlation coefficient](https://arxiv.org/abs/1909.10140)
+
+::: {.callout-note title="Question"}
+
+Write a `dplyr` pipeline from computing the $ξ$ correlation coefficient between `Y=lifeExp` and `X=gdpPercap`
+in the `gapminder` dataset, per `year` and `continent`. 
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
+
+```{r}
+tab_xi <- gapminder::gapminder |>  
+  group_by(year, continent) |> 
+  arrange(gdpPercap) |> 
+  mutate(rnk= row_number(lifeExp), 
+         lnk=rank(desc(lifeExp), ties.method = "max"), 
+         N=n()) |> 
+  mutate(fol=lead(rnk), dd=abs(fol-rnk)) |> 
+  summarise(Xi=1-n()*sum(dd, na.rm = T)/(2*sum(lnk*(N-lnk), na.rm = T))) 
+  
+tab_xi  |> 
+  print(n=10)  
+```
+
+
+```{r}
+tab_xi |>
+  pivot_wider(
+    id_cols=continent, 
+    names_from=year,
+    values_from=Xi
+    ) |>
+  gt::gt() |>
+  gt::fmt_number(decimals=2)
+```
+
+:::
+:::
+
+# Using package `corrr`
+
+[https://corrr.tidymodels.org](https://corrr.tidymodels.org)
+
+
+::: {.callout-note title="Question"}
+
+Use `corrr::correlate()`  and companion functions to display correlation
+coefficients in a friendly way. 
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
+
+```{r}
+#| output-location: column
+c <- df |>
+  select(where(is.numeric)) |>
+  corrr::correlate()
+```
+
+
+```{r}
+#| output-location: column
+c |>
+  corrr::shave()
+```
+
+```{r}
+#| output-location: column
+c |>
+  corrr::fashion()
+```
+
+```{r}
+#| output-location: column
+
+c |> 
+  corrr::shave() |>
+  corrr::rplot()
+```
+
+::: 
+ 
+:::
+
 
 
 # `pairs` from base `R`
 
+Just as function `skim` from package `skimr` allows us to automate univariate analysis,  function `pairs` from base `R` allows us to automate bivariate analysis.
 
-# `ggpairs()`
+::: {.callout-note title="Question"}
+
+- Apply function `pairs` to the `Recensement` dataset
+- How does `pairs` handle pairs of categorical columns?
+- How does `pairs` handle pairs of numerical columns?
+- How does `pairs` handle categorical/numerical columns?
+- Suggestions for improvements?
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
+```{r}
+pairs(df)
+```
+::: 
+
+:::
+
+
+# `ggpairs()` from `GGally`
+
+[Documentation](https://www.rdocumentation.org/packages/GGally/versions/2.2.1/topics/ggpairs)
+
+::: {.callout-note title="Question"}
+
+- Apply function `GGally::ggpairs()` to the `Recensement` dataset
+- How does `ggpairs` handle pairs of categorical columns?
+- How does `ggpairs` handle pairs of numerical columns?
+- How does `ggpairs` handle categorical/numerical columns?
+- How does `ggpairs` handle diagonal diagrams? 
+- How can you modify layout, labels, ticks? 
+- Suggestions for improvements?
+  
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
+
+```{r}
+df |>
+  select(-REV_FOYER) |>
+  GGally::ggpairs()
+```
+::: 
+
+:::
 
 # Useful links
 
-- [rmarkdown](bookdown.org/yihui/rmarkdown)
+- [rmarkdown](bookdown.org/$y_i$hui/rmarkdown)
 - [dplyr](https://gplot2.tidyverse.org)
 - [ggplot2](https://ggplot2.tidyverse.org)
 - *R Graphic Cookbook*. Winston Chang. O' Reilly.
@@ -487,17 +755,4 @@ df |>
 
 
 
-```{r}
-expand.grid(levels(df$CATEGORIE), levels(df$SEXE))
-```
-
-```{r}
-df |> 
-  select(CATEGORIE, SEXE) |> 
-  table() |> 
-  mosaicplot()
-```
-```{r}
-pchisq(140, df=5, lower.tail = F)
-```
 
