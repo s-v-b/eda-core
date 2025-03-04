@@ -55,7 +55,10 @@ stopifnot(
   require("corrr"),
   require("GGally"),
   require("broom"),
-  require("tidyverse")
+  require("tidyverse"),
+  require("ggfortify"),
+  require("autoplotly")
+
 )
 ```
 
@@ -67,7 +70,8 @@ At some point, we will showcase the exposing pipe `%$%` and the classical pipe `
 #| echo: false
 #| include: false
 #| eval: true
-
+#| label: theming
+#| 
 # Setting the look and feel of our plots
 old_theme <- theme_set(
   theme_minimal()
@@ -82,7 +86,7 @@ The dataset is available from package `MASS`. `MASS` can be downloaded from `cra
 
 ```{r}
 #| eval: true
-#| 
+#| label: whiteside-load
 whiteside <- MASS::whiteside # no need to load the whole package
 
 cur_dataset <- str_to_title(as.character(substitute(whiteside)))
@@ -102,6 +106,7 @@ The question is wether  the  treatment (insulation) modifies the relation betwee
 Have a glimpse at the data. 
 
 ```{r}
+#| label: whiteside-glimpse
 whiteside %>% 
   glimpse
 ```
@@ -133,6 +138,7 @@ Before before proceeding to linear regressions of `Gas` with respect to `Temp`, 
 columns from the output. 
 
 ```{r}
+#| label: skim-it
 whiteside |>
   skimr::skim() |>
   select(-n_missing, -complete_rate, -factor.ordered, - factor.n_unique) |>
@@ -144,6 +150,7 @@ whiteside |>
 An  alternative way of doing this univariate  analysis consists in separating categorical variables from numerical ones. 
 
 ```{r}
+#| label: catego-summaries
 #| eval: false
 #| echo: true
 sk <- whiteside %>% 
@@ -193,6 +200,8 @@ We may use the Jarque-Bera test [See R bloggers on this](https://www.r-bloggers.
 #| label: jb-test
 #| appendix: true
 #| echo: false
+#| warning: false
+#| message: false
 jb <- tseries::jarque.bera.test
 
 whiteside |> 
@@ -227,6 +236,7 @@ To abide to the DRY principle,  we take
 advantage of the fact that aesthetics and labels can be tuned incrementally. 
 
 ```{r}
+#| label: histo-seasons
 p_xx <- whiteside |>
     ggplot() +
       geom_histogram(
@@ -260,7 +270,7 @@ Gas Consumption distribution `After` looks shifted with respect to distribution 
 Another visualization strategy consists in using the faceting mechanism
 
 ```{r}
-
+#| label: before-after-histo-facet
 r <- whiteside %>% 
   pivot_longer(cols=c(Gas, Temp),
               names_to = "Vars",
@@ -275,6 +285,31 @@ r +
   geom_histogram(alpha=.3, fill="white", color="black", bins=6) +
   ggtitle(glue("{cur_dataset} data"))
 ```
+
+
+```{r}
+#| label: anova-temp-insul-1
+
+lm(Temp ~ Insul, data=whiteside) |>
+  broom::glance()
+```
+
+```{r}
+#| label: anova-temp-insul-2
+
+lm(Temp ~ Insul, data=whiteside) |>
+  anova()  |>
+  broom::tidy() |>
+  gt::gt() |>
+  gt::fmt_number(decimals = 3) |>
+  gt::tab_caption("Testing temperature homogeneity over the seasons")
+```
+
+The difference between temperature distributions over the two seasons is not deemed to be significant by ANOVA. 
+
+It is important that the grouping variable (here `Insul`) is a factor.
+
+
 :::
 
 :::
@@ -294,12 +329,13 @@ Compute the covariance matrix of `Gas` and `Temp`
 ::: {.callout-tip title="Solution"}
 
 
-
-
-
-
-
 ```{r}
+#| label: using-cov
+# Compute the covariance matrix for Gas and Temp
+C <- whiteside |>
+  select(where(is.numeric)) |> 
+  cov()
+
 mu_n <- whiteside %>% 
   select(where(is.numeric)) %>% 
   colMeans()
@@ -307,35 +343,30 @@ mu_n <- whiteside %>%
 
 
 
+```{r}
+#| output: asis
+#| caption: "Covariance matrix of Gas and Temp"
+matador::mat2latex(round(C,2))
+```
 
-$$
-C_n = \begin{bmatrix}
-7.56 & -2.19\\
--2.19 & 1.36
-\end{bmatrix} \qquad \mu_n = \begin{bmatrix}
-4.88\\
-4.07
-\end{bmatrix}
-$$
+
 :::
 
 :::::
 
+::: {.callout-note title="Question"}
+
+
+
+- Compute correlations (Pearson, Kendall, Spearman) and correlations per group
+- Comment
+
+:::
 
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
-
-```{r}
-# Compute the covariance matrix for Gas and Temp
-C <- whiteside |>
-  select(where(is.numeric)) |> 
-  cov()
-```
-
-
-Computing correlations and correlations per groups is revealing. 
 
 ```{r}
 # use magrittr pipe %>%  to define a pipeline function
@@ -346,14 +377,28 @@ my_cor <-  . %>%
     spearman=cor(Temp,Gas, method="spearman")
   ) 
 
+# even better: pass column names as arguments
+
+my_cor2 <-  function(df, col1, col2){
+  df %>% 
+  summarize(
+    pearson= cor({{col1}}, {{col2}}, method="pearson"),
+    kendall=cor({{col1}}, {{col2}}, method="kendall"),
+    spearman=cor({{col1}}, {{col2}}, method="spearman")
+  ) 
+}
+
 t1 <- whiteside |>
   group_by(Insul) |> 
   my_cor()
 
+# group_by(whiteside, Insul) |> my_cor2(Gas, Temp)
 
 t2 <- whiteside |>
   my_cor() |>
   mutate(Insul="pooled")
+
+# whiteside |> my_cor2(Gas, Temp) |> mutate(Insul="pooled")
 
 bind_rows(t1, t2)  |> 
     gt() |>
@@ -363,17 +408,40 @@ bind_rows(t1, t2)  |>
 
 Note the sharp increase of all correlation coefficients we data are grouped according to the control/treatment variable (`Insul`).
 
+:::
+
+:::
+
+::: {.callout-note title="Question"}
+
+
 Use `ggpairs` from `GGally` to get a quick overview of the pairwise interactions.
 
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title="Solution"}
+
 ```{r}
+#| label: ggally-ggpairs
+#| warning: false
+#| message: false
+
+
+theme_set(theme_minimal())
+
 whiteside |>
   GGally::ggpairs()
 ```
 
-
 :::
 
-:::
+:::::
+
+
+
+
 
 
 ::: {.callout-note title="Question"}
@@ -387,8 +455,9 @@ Build a scatterplot of the Whiteside dataset
 
 ::: {.callout-tip title="Solution"}
 
-```{r whiteside-scatter}
-p <- whiteside %>% 
+```{r}
+#| label: whiteside-scatter
+p <- whiteside |> 
   ggplot() +
   aes(x=Temp, y=Gas) +
   geom_point(aes(shape=Insul)) +
@@ -419,7 +488,7 @@ Build boxplots of `Temp` and  `Gas` versus `Insul`
 ::: {.callout-tip title="Solution"}
 
 ```{r}
-
+#| label: boxplots
 q <- whiteside %>% 
   ggplot() +
   aes(x=Insul)
@@ -451,6 +520,8 @@ Build violine plots  of `Temp` and `Gas` versus `Insul`
 
 ::: {.callout-tip title="Solution"}
 ```{r}
+#| label: violines
+#| 
 (q + 
   geom_violin(aes(y=Temp))) +
 (q + 
@@ -475,6 +546,7 @@ Plot density estimates of  `Temp` and `Gas` versus `Insul`.
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: densities
 r +
   stat_density(alpha=.3 , 
                fill="grey", 
@@ -501,6 +573,8 @@ Compute slope and intercept using elementary computations
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: slr-hand-made
+#| 
 slope <- C[1,2] / C[1,1] # slope 
 
 intercept <- whiteside %$%  # exposing pipe from magrittr
@@ -528,6 +602,8 @@ Overlay the scatterplot with the regression line.
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: overlay-scatterplot
+#| 
 p + 
   geom_abline(slope=slope, intercept = intercept) +
   ggtitle(glue("{cur_dataset} data"), subtitle = "Least square regression line")
@@ -548,7 +624,11 @@ p +
 
 ::: {.callout-note title="Question"}
 
-Use `lm()` to compute slope and intercept
+Use `lm()` to compute slope and intercept. Denote the object created 
+by constructor `lm()` as `lm0`. 
+
+- What is the class of `lm0` ?
+- 
 
 :::
 
@@ -557,6 +637,7 @@ Use `lm()` to compute slope and intercept
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: lm0
 lm0 <- lm(Gas ~ Temp, data = whiteside)
 ```
 
@@ -565,6 +646,7 @@ The result is an object of class `lm`.
 The generic function `summary()` has a method for class `lm`
 
 ```{r}
+#| label: lm0-summary
 lm0 %>% 
   summary()
 ```
@@ -594,6 +676,7 @@ For html output `gt::gt()` allows us to polish the final output
 We can use the exposing pipe from `magrittr` (or the `with` construct from base `R`) 
 to build a function that extracts the coefficients estimates, standard error, $t$-statistic and associated p-values.  
 ```{r}
+#| label: tidy-steroids
 tidy_lm <- . %$% (    # <1>  The lhs is meant to be of class lm
   tidy(.)  %>%         # <2> . acts as a pronoun for magrittr pipes     
   gt::gt() %>% 
@@ -608,7 +691,6 @@ tidy_lm(lm0)
 of lazy evaluation mechanisms. 
 
 
-TODO: more on `glue()` 
 
 :::
 
@@ -627,6 +709,8 @@ Function `glance()` extract informations that can be helpful when performing mod
 
 The next chunk handles several other parts of the summary. 
 ```{r}
+#| label: glance-steroids
+#| 
 glance_lm <-  . %$% (
   glance(.) %>% 
   mutate(across(-c(p.value), 
@@ -657,9 +741,12 @@ glance_lm(lm0)
 
 ::: {.callout-note title="Solution"}
 
-Under the Gaussian homoschedastic noise assumption, `confint()` produces confidence intervals for estimated coefficients. Using the union bound, we can derive a conservative confidence rectangle.  
+Under the Gaussian homoschedastic noise assumption, `confint()` 
+produces confidence intervals for estimated coefficients. 
+Using the union bound, we can derive a conservative confidence rectangle.  
 
 ```{r}
+#| label: confint-lm
 M <- confint(lm0, level=.95)  
 
 as_tibble(M) |>
@@ -667,6 +754,21 @@ as_tibble(M) |>
   relocate(Coeff) |>
   gt::gt() |>
   gt::fmt_number(decimals=2)
+```
+
+```{r}
+#| label: multiple-confidence-rectangle
+conf_levels <- c(.90, .95, .99)
+
+purrr::map(conf_levels, \(x) confint(lm0, level=x)) |>
+  purrr::map(as_tibble) |>
+  purrr::map(\(x) mutate(x, coeffs=c("Intercept", "Temp")))|>
+  purrr::map(\(x) pivot_longer(x, cols=ends_with("%"), names_to="conf", values_to="bound")) |>
+  bind_rows() |>
+  gt::gt() |>
+  gt::fmt_number(decimals = 2)
+
+
 ```
 
 :::
@@ -685,8 +787,66 @@ Plot a $95\%$ confidence region for the parameters  (assuming homoschedastic Gau
  
 ::: {.callout-tip title="Solution"}
 
-```{r}
+Assuming homoschedastic Gaussian noise, the distribution of $(X^T X)^{1/2}\frac{\widehat{\theta}- \theta}{\widehat{\sigma}}$
+is $\frac{\mathcal{N}(0, \text{Id}_p)}{\sqrt{\chi^2_{n-p}/(n-p)}}$ with $p=2$ and $n=56$, where  the Gaussian vector and 
+the $\chi^2$ variable are independent. Hence
+$$\frac{1}{2}\left\Vert (X^T X)^{1/2}\frac{\widehat{\theta}- \theta}{\widehat{\sigma}} \right\Vert^2= \frac{(\widehat{\theta}-\theta)^T X^TX (\widehat{\theta}-\theta)}{2\widehat{\sigma}^2}$$
+is distributed accordding to a Fisher distribution with $p=2$ and $n-p=54$ degrees of freedom. Let $f_{\alpha}$ denote the 
+quantile of order $1-\alpha$ of the Fisher distribution with $p=2$ and $n-p=54$ degrees of freedom, the following 
+ellipsoid is a $1-\alpha$ confidence region:
+$$\left\{ \theta : \frac{(\widehat{\theta}-\theta)^T X^TX (\widehat{\theta}-\theta)}{2\widehat{\sigma}^2} \leq f_{\alpha}\right\}$$
 
+
+
+
+```{r}
+X <- model.matrix(lm0)
+coefficients(lm0)["(Intercept)"]
+sum(residuals(lm0)^2)
+```
+
+
+
+
+```{r}
+#| label: confidence-region
+#| 
+conf_region <- function(X, x0=0, y0=0, sigma=1, df1=2, df2=nrow(X)-2, alpha=.05, ...){ 
+
+  falpha <- qf(alpha, df1, df2, lower.tail = F)
+
+  specdec <- eigen(t(X) %*% X)
+  angle <- acos(specdec$vectors[1,1])
+  a <- sigma * sqrt(2*falpha/specdec$values[1])
+  b <- sigma * sqrt(2*falpha/specdec$values[2])
+
+  
+
+  ggforce::geom_ellipse(
+    aes(
+      x0= x0,
+      y0= y0,
+      a = a,
+      b = b,
+      angle= angle
+    ),
+    ...
+)
+}
+```
+
+```{r}
+#| label: plot-confidence-region
+
+require(zeallot)  # experimental 
+
+c(x0,y0) %<-% coefficients(lm0)
+
+ggplot() +
+  conf_region(X, x0, y0, linetype='dashed') +
+  conf_region(X, x0, y0, alpha=.01, linetype='dotted') +
+  conf_region(X, x0, y0, alpha=.1, )
+  coord_fixed()
 ```
 
 ::: 
@@ -696,6 +856,13 @@ Plot a $95\%$ confidence region for the parameters  (assuming homoschedastic Gau
 # Diagnostic plots
 
 Method `plot.lm()` of generic S3 function `plot`  from base `R` offers six diagnostic plots. By default it displays four of them. 
+
+::: {.callout-tip}
+
+In order to obtain diagnostic plots as ggplot objects, use package `ggfortify` which defines an S3 method for class 'lm' for generic function  `autoplot` (defined 
+in package `ggplot`). 
+
+:::
 
 ::: {.callout-note title="Question"}
 
@@ -708,18 +875,164 @@ What are the diagnostic plots good for?
 
 ::: {.callout-tip title="Solution"}
 
+Diagnostic plots for linear regression serve several purposes:
+
+- Visualization of  possible dependencies between residuals and fitted values. OLS theory tells us that residuals and fitted values are (empirically) linearly uncorrelated. 
+This does not preclude other kinds of dependencies. 
+- With some overplotting, it is also possible to visualize possible dependencies between residuals and variables that were not taken into account while computing OLS estimates. 
+- Assesment of possible heteroschedasticity, for example, dependence of noise variance on fitted values.
+- Assessing departure of noise distribution from Gaussian setting.
+- Spotting points with high leverage
+- Spotting possible outliers. 
+
+::: {.callout-note title="Question"}
+
+Load package `ggfortify`, and call `autoplot()` (from `ggplot2`) to build the diagnostic plots for `lm0`. 
+
+Generic function `autoplot()` called on  on an object of class `lm` builds a collection of grapical objects that 
+parallel the output of base `R`  generic `plot()` function. The graphical objects output by `autoplot()` can be 
+further tweaked as any `ggplot` object.   
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+::: {.callout-tip title="Solution"}
+
+
+
 ```{r}
-plot(lm0)  
+#| label: vanilla
+vanilla <- c(
+  "title"= "Diagnostic plot for linear regression  Gas ~ Temp",
+  "caption"= "Whiteside data from package MASS"
+)
 ```
+
+
+```{r}
+#| label: autoplot-lm0
+diag_plots <- autoplot(lm0, data=whiteside)
+```
+
+`diag_plots` is an instance of an [`S4`  class]() 
+
+```{r}
+class(diag_plots)
+```
+
+:::
+
+:::
+
+
+```{r}
+diag_plots@plots[[1]] +
+  labs(!!!vanilla)
+```
+
+This diagnostic plots would be much more helpful if we could map `Insul` on the `shape` aesthetics. 
+
+```{r}
+# diag_plots@plots[[1]]  + aes(shape=Insul)
+```
+
+```{r}
+lm0_augmented <- augment(lm0, data=whiteside) 
+
+lm0_augmented |>
+  ggplot() +
+  aes(x=.fitted, y=.resid) +
+  geom_point(aes(shape=Insul)) +
+  geom_smooth(formula='y~x', 
+              method="loess", 
+              se=T, 
+              color="black",
+              linewidth=.5) +
+  xlab("Fitted values") +
+  ylab("Residuals") +
+  labs(
+    !!!vanilla,
+    subtitle = "Residuals versus fitted values"
+  )
+```
+
+Overplotting (mapping `Insul` over shape aesthetics) reveals that residuals 
+do depend on `Insul`: residual signs are a function of `Insul`. 
+
+The *smooth* regression line (blue line) departs from the `x` axis, but not in a striking way.  
+
+```{r}
+#| label: patch-diag-plots
+patchwork::wrap_plots(
+  (diag_plots@plots[[2]] + coord_fixed() + labs()),  
+  (
+  augment(lm0, whiteside) |>
+  ggplot() +
+    aes(y=sort(.std.resid), 
+        x=qnorm(seq_along(.std.resid)/length(.std.resid))) +
+    geom_point(aes(shape=Insul)) + 
+    geom_abline(intercept = 0, slope=1.0111398) +
+    geom_smooth(method="lm", se=F, linetype="dotted") +
+    geom_abline(intercept=0, slope=4/3) +
+    xlab("Normal quantiles") +
+    ylab("Standardized residuals") +
+    coord_fixed() +
+    labs()
+  )
+) +
+patchwork::plot_annotation(
+  title =vanilla["title"],
+  subtitle="QQ plots for linear regression",
+  caption = vanilla["caption"]
+  )
+```
+
+```{r}
+diag_plots@plots[[3]] +
+  geom_smooth(method="lm", se=T, formula='y ~ x', linetype="dotted") +
+  labs(
+    !!!vanilla,
+    subtitle = "Standardized residuals versus fitted values"
+  )
+```
+
+The amplitude of *standardized residuals* seems to be an increasing function of 
+fitted values. This suggests departure from homoschedasticity. 
+
+Two points are singled out (with row index)
+
+
+```{r}
+diag_plots@plots[[4]] +
+  
+  labs(
+    !!!vanilla,
+    subtitle = ""
+  )
+```
+Double check points with high leverage.
+
+Why points with high leverage and large standardized residuals matter. 
+
+
 
 The motivation and usage of diagnostic plots is explained in detail in the book by Fox and Weisberg: *An R companion to applied regression*.
 
+In words, the diagnostic plots serve to assess the validity of the Gaussian linear modelling assumptions on the dataset. The assumptions can be challenged for a number of reasons:
+
+- The response variable may be a function of the covariates but not a lienar one. 
+- The noise may be heteroschedastic
+- The noise may be non-Gaussian
+- The noise may exhibit dependencies.  
 
 :::
 
 :::
 
-The diagnostic plots can be built from the information gathered in the `lm` object returned by `lm(...)`. 
+The diagnostic plots are built from the information gathered in the `lm` object returned by `lm(...)`. 
 
 {{< fa broom >}} It is convenient to extract the required pieces of information using method `augment.lm`. of *generic function* `augment()` from package `broom`. 
 
@@ -727,6 +1040,12 @@ The diagnostic plots can be built from the information gathered in the `lm` obje
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
+
+
+```{r}
+autoplot(lm0)
+```
+
 
 ```{r}
 #| label: augment-lm0 
@@ -802,8 +1121,12 @@ diag_1 <- whiteside_aug %>%
 
 :::
 
+::: {.callout-note title="Question"}
 
 Fitted against square root of standardized residuals.
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
@@ -829,6 +1152,13 @@ diag_3 <- whiteside_aug %>%
 
 :::
 
+::: {.callout-note title="Question"}
+
+Hand-made normal qqplot for `lm0` 
+
+:::
+
+
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
@@ -842,7 +1172,7 @@ diag_2 <- whiteside_aug %>%
   stat_qq_line(linetype="dotted",
               linewidth=.5,
               color="black") +
-  coord_fixed() +
+#  coord_fixed() +
   labs(caption="Residuals qqplot") +
   xlab("Theoretical quantiles") +
   ylab("Empirical quantiles of standadrdized residuals")
@@ -852,7 +1182,12 @@ diag_2 <- whiteside_aug %>%
 
 :::
 
-TAF
+::: {.callout-note title="Question"}
+
+
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
@@ -873,8 +1208,13 @@ TAF
 
 # Taking into account Insulation
 
+::: {.callout-note title="Question"}
+
 Design a *formula* that allows us to take into account the possible 
 impact of Insulation. Insulation may impact the relation between weekly `Gas` consumption and average external `Temperature` in two ways. Insulation may modify the `Intercept`, it may also modify the slope, that is the sensitivity of `Gas` consumption  with respect to average external `Temperature`. 
+
+:::
+
 
 ::: {.callout-tip}
 
@@ -888,37 +1228,64 @@ Have a look at formula documentation (`?formula`).
 
 
 ```{r}
+#| label: big-formula
 lm1 <- lm(Gas ~ Temp * Insul, data = whiteside)
+
+vanilla_lm1 <- vanilla
+vanilla_lm1["title"] <- "Diagnostic plot for linear regression  Gas ~ Temp*Insul"
 ```
-
 :::
 
 :::
+
+::: {.callout-note title="Question"}
 
 Check the design using function `model.matrix()`. How can you relate this augmented design and the *one-hot encoding* of variable `Insul`?
 
 
+:::
+
+
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
 ```{r}
-
+#| label: check-design
 model.matrix(lm1) |>
   head()
-
 ```
 
+`InsulAfter` is the result of *one-hot encoding* of boolean column `Insul`: 
+`Before` is encoded by `0` and `After` is encoded by `1`. 
+
+`Temp:InsulAfter` is the elementwise product of `Temp`  and `InsulAfter`. 
+
+In *one-hot-encoding*, a categorical columns with `k` levels is mapped to `k` `0-1` valued 
+columns. An occurrence of level `j : 1 ≤ j ≤ k` is mapped to a sequence of `j-1` `0`'s, a `1`, followed by `k-j` `0`'s.   
+The resulting matrix has column rank at most 'k-1', since the rowsums are all equal to `1`. 
+In order to eliminate this redundancy, one of the `k` columns is dropped. 
+Here the column with `1`'s for `Before`  has been dropped. 
+
+Note that other encodings (called *contrasts* in the statistics literature) are possible.
+
+ 
 :::
 
 :::
 
+::: {.callout-note title="Question"}
+
+Display and comment the part of the summary of `lm1` concerning estimated coefficients.
+
+:::
 
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: lm1-tidy
 lm1 %>% 
   tidy_lm()
 ```
@@ -932,21 +1299,73 @@ lm1 %>%
 ::: {.callout-tip title="Solution"}
 
 ```{r}
-lm0 |>
-  glance_lm()
-lm1 %>% 
-  glance_lm()
+#| label: lm0-lm1-glance
+bind_rows(
+  lm0 |>
+    glance() |>
+    mutate(model="Gas ~ Temp"),
+  lm1 |>
+    glance() |>
+    mutate(model="Gas ~ Temp*Insul")
+) |>
+  relocate(model) |>
+  gt::gt() |>
+  gt::fmt_number(decimals=2) |>
+  gt::tab_caption("Comparing two models for Whiteside dataset")
 ```
 
 :::
 
 :::
 
+::: {.callout-note title="Question"}
+
+Comment the diagnostic plots built from the extended model using `autoplot()`. If possible, 
+generate alternative diagnostic plots pipelining `broom`  and `ggplot2`. 
+
+:::
+
+
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
+
 ```{r}
+#| label: autoplot-lm1
+diag_plots_lm1 <- autoplot(lm1, data=whiteside)
+```
+
+```{r}
+#| label: lm1-residuals-fitted
+diag_plots_lm1@plots[[1]] +
+  labs(
+    !!!vanilla_lm1,
+    subtitle="Residuals versus fitted values"
+  )
+```
+
+```{r}
+#| label: lm1-residuals-fitted-hand-made
+
+whiteside_aug1 <-  augment(lm1, whiteside)
+
+whiteside_aug1 |>
+  ggplot() + 
+  aes(x=.fitted, y=.resid) +
+  geom_point(aes(shape=Insul)) +
+  geom_smooth(method="loess", formula='y ~ x') +
+  labs(
+    !!!vanilla_lm1,
+    subtitle="Residuals versus fitted values"
+  )
+```
+
+The sign of residuals does  not look like a function of `Insul` anymore. 
+
+```{r}
+#| label: tweaking-p
+#| 
 p +
   geom_smooth(formula='y ~ poly(x, 2)',linewidth=.5, color="black",linetype="dashed",  method="lm", se=FALSE)+
   aes(color=Insul) +
@@ -969,19 +1388,55 @@ p +
 ::: {.callout-tip title="Solution"}
 
 ```{r lm1-diagnostics}
-whiteside_aug1 <-  augment(lm1, whiteside)
+#| label: diag-plots-lm1 
 
 (diag_1 %+% whiteside_aug1) +
-(diag_2 %+% whiteside_aug1) +
 (diag_3 %+% whiteside_aug1) +  
- guide_area() +
-  plot_layout(guides = "collect") +
+(diag_2 %+% whiteside_aug1) +
+  guide_area() +
+  plot_layout(guides = "collect",) +
   plot_annotation(title=glue("{cur_dataset} dataset"),
                   subtitle = glue("Regression diagnostic  {deparse(lm1$call$formula)}"), caption = 'One possible outlier.\n Visible on all three plots.'
                   )
 ```
 
+
 The formula argument defines the design matrix and the Least-Squares problem used to estimate the coefficients.
+
+```{r}
+cowplot::plot_grid(
+  (diag_1 %+% whiteside_aug1),
+  (diag_3 %+% whiteside_aug1),
+  (diag_2 %+% whiteside_aug1),
+  align="none",
+  nrow=3, 
+  labels=c('A', 'B', 'C')
+)
+```
+
+```{r}
+diag_plots_lm1@plots[[1]] + 
+  diag_plots_lm1@plots[[3]] +
+  patchwork::plot_annotation(
+    title="Gas ~ Temp * Insul",
+    # subtitle = "Residuals versus fitted",
+    caption="Whiteside data"
+  )
+```
+
+```{r}
+diag_plots_lm1@plots[[2]] +
+  labs(!!!vanilla_lm1)
+```
+
+
+
+```{r}
+diag_plots@plots[[4]] +
+  labs(
+    !!! vanilla_lm1
+  )
+```
 
 :::
 
@@ -996,14 +1451,19 @@ Function `model.matrix()` allows us to inspect the design matrix.
 ::: {.callout-tip title="Solution"}
 
 ```{r design_matrix}
+#| label: lm1-design-matrix
 model.matrix(lm1) %>% 
   as_tibble() %>% 
   mutate(Insul=ifelse(InsulAfter,"After", "Before")) %>% 
   ungroup() %>% 
-  DT::datatable(caption=glue("Design matrix for {deparse(lm1$call$formula)}"))
+  slice_sample(n=5) |>
+  gt::gt() |>
+  gt::tab_caption(glue("Design matrix for {deparse(lm1$call$formula)}")) 
 ```
 
 ```{r design-matrix}
+#| label: extract-design-matrix-lm1
+#| 
 X <- model.matrix(lm1)
 ```
 
@@ -1024,7 +1484,9 @@ This can be done in several ways.
 ::: {.callout-tip title="Solution"}
 
 
-```{r QR-design-matrix}
+```{r }
+#| label: QR-design-matrix
+#| 
 Q <- qr.Q(lm1$qr)
 R <- qr.R(lm1$qr)  # R is upper triangular 
 
@@ -1042,13 +1504,15 @@ norm(H - H %*% H, type="F") # H is idempotent
 # eigen(H, symmetric = TRUE, only.values = TRUE)$values
 ```
 
-```{r solving-normal-equations}
+```{r}
+#| label: solving-normal-equations
 sum((solve(t(X) %*% X) %*% t(X) %*% whiteside$Gas - lm1$coefficients)^2)
 ```
 
 Once we have the QR factorization of $X$, solving the normal equations boils down to inverting a triangular matrix. 
 
-```{r solving-normal-equations-r}
+```{r}
+#| label: solving-normal-equations-r
 sum((solve(R) %*% t(Q) %*% whiteside$Gas - lm1$coefficients)^2)
 ```
 
@@ -1075,7 +1539,8 @@ $$
 ::: {.callout-tip title="Solution"}
 
 
-```{r fitted-H-matrix}
+```{r }
+#| label: fitted-H-matrix
 whiteside_aug1 %>% 
   glimpse()
 ```
@@ -1093,6 +1558,7 @@ Understanding `.fitted` column
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: predict-project
 sum((predict(lm1, newdata = whiteside) - whiteside_aug1$.fitted)^2)
 
 sum((H %*% whiteside_aug1$Gas - whiteside_aug1$.fitted)^2)
@@ -1102,14 +1568,22 @@ sum((H %*% whiteside_aug1$Gas - whiteside_aug1$.fitted)^2)
 
 :::
 
+::: {.callout-note title="Question"}
 
-Understanding `.resid`
+Try understanding the computation of `.resid` in an `lm` object. 
+Compare `.resid` with the projection of `Gas` on the linear subspace orthogonal 
+to the columns of the design matrix. 
+
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: check-signif-resid
 sum((whiteside_aug1$.resid + H %*% whiteside_aug1$Gas - whiteside_aug1$Gas)^2)
 ```
 
@@ -1117,14 +1591,20 @@ sum((whiteside_aug1$.resid + H %*% whiteside_aug1$Gas - whiteside_aug1$Gas)^2)
 
 :::
 
+::: {.callout-note title="Question"}
 
 Understanding `.hat`
+
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#|  label: interpret-hat-column-hat-matrix
 sum((whiteside_aug1$.hat - diag(H))^2)
 ```
 
@@ -1133,17 +1613,30 @@ sum((whiteside_aug1$.hat - diag(H))^2)
 :::
 
 
+::: {.callout-note title="Question"}
 
 Understanding `.std.resid` 
+
+- Estimate noise intensity from `residuals`
+- Compare with the output of `glance()`
+
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
 ::: {.callout-tip title="Solution"}
 
 ```{r}
+#| label: check-sigma 
 sigma_hat <- sqrt(sum(lm1$residuals^2)/lm1$df.residual)
 
-lm1 %>% glance() 
+lm1 |>
+  glance() |>
+  gt::gt() |>
+  gt::fmt_number(decimals=2) |>
+  gt::tab_caption(glue("The hand-made estimate of sigma is {round(sigma_hat,2)}"))
 ```
 
 $$
@@ -1152,6 +1645,7 @@ $$
 
 
 ```{r}
+#| label: check-standardized-residuals
 sum((sigma_hat * sqrt(1 -whiteside_aug1$.hat) * whiteside_aug1$.std.resid - whiteside_aug1$.resid)^2)
 ```
 
@@ -1160,7 +1654,12 @@ sum((sigma_hat * sqrt(1 -whiteside_aug1$.hat) * whiteside_aug1$.std.resid - whit
 
 :::
 
+::: {.callout-note title="Question"}
+
 Understanding column `.sigma` 
+
+:::
+
 
 ::: {.content-visible when-profile="solution"}
 
@@ -1178,5 +1677,28 @@ $$
 :::
 
 :::
+
+
+# Appendix
+
+## `S3`  classes in `R`
+
+
+
+
+## Generic functions for `S3`  classes
+
+`methods(autoplot)` lists the `S3` classes for which an  autoplot method is defined. 
+Some methods are defined in `ggplot2`, others like `autoplot.lm` are defined in extension 
+packages like `ggfortify`. 
+
+
+
+## `S4` classes in `R`
+
+The output of `autoplot.lm` is an instance  of `S4` class
+
+
+## `tibbles` with list columns
 
 
