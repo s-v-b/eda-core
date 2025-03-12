@@ -1,0 +1,1257 @@
+---
+date: "`r Sys.time()`"
+title: "LAB: Principal Component Analysis"
+
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+format:
+  html:
+    output-file: lab-pca.html
+  pdf:
+    output-file: lab-pca.pdf
+
+
+engine: knitr
+---
+
+
+```{r}
+#| label: setup-packages
+#| echo: true
+#| message: false
+#| warning: false
+#| include: true
+
+# We will use the following packages. 
+# If needed, install them : pak::pkg_install(). 
+stopifnot(
+  require("magrittr"),
+  require("lobstr"),
+  require("ggforce"),
+  require("gt"),
+  require("glue"),
+  require("skimr"),
+  require("corrr"),
+  require("patchwork"), 
+  require("tidyverse")
+  # require("autoplotly")
+)
+```
+```{r}
+#| label: setup-theme
+#| message: false
+#| warning: false
+#| include: true
+#| 
+
+old_theme <- theme_set(theme_minimal())
+```
+
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| echo: false
+#| eval: true
+#|
+source(file = "./UTILS/make_biotiful.R")
+```
+
+
+## Swiss fertility data
+
+
+Dataset  `swiss`  from `datasets::swiss` connect [fertility](https://en.wikipedia.org/wiki/Total_fertility_rate) and
+social, economic data within 47 French-speaking districts in [Switzerland](https://en.wikipedia.org/wiki/Switzerland).
+
+-   `Fertility` : fertility index
+-   `Agriculture` : jobs in agricultural sector
+-   `Examination` : literacy index (military examination)
+-   `Education` : proportion of people with successful secondary education
+-   `Catholic` : proportion of Catholics
+-   `Infant.Mortality` : mortality quotient at age 0
+
+Fertility index (`Fertility`) is considered as the *response variable*
+
+The social and economic variables are *covariates* (*explanatory* variables).
+
+See [European Fertility Project](https://pop.princeton.edu/european-fertility-project#:-:text=switzerland) for more on this dataset.
+
+![](/images/Karte_Bezirke_der_Schweiz_farbig_2018.png)
+
+
+PCA (Principal Component Analysis) is concerned with covariates.
+
+```{r}
+#| results: markup
+data("swiss")
+
+swiss %>% 
+  glimpse(50)
+```
+
+Have a look at the documentation of the dataset
+```{r}
+#| include: false
+?swiss
+```
+
+## Describe the dataset
+
+::: {.callout-note title="Question"}
+
+Compute summary for each variable
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::: {.callout-tip title="solution"} 
+
+It is enough to call `summary()` on each column of `swiss`. 
+This can be done in a functional programming style using package `purrr`. 
+The collections of summaries can be rearranged so as to build a dataframe that is 
+fit for reporting.  
+
+
+
+```{r}
+tt <- map_dfr(swiss, summary, .id = "var")  
+```
+
+::: {.content-visible when-format="html"}
+```{r} 
+#| eval: !expr knitr::is_html_output()
+tt |> 
+  gt::gt() |> 
+  gt::fmt_number(decimals=1)
+```
+:::
+
+::: {.content-visible when-format="pdf"}
+```{r}
+#| eval: !expr knitr::is_latex_output()
+tt %>% 
+  knitr::kable()
+```
+:::
+
+Function `skim` from `skimr`  delivers all univariate summaries in suitable form. 
+
+```{r}
+foo <- swiss %>% 
+  select(-Fertility) %>% 
+  skim()  
+```
+
+```{r}
+foobar <- foo %>%  
+  filter(skim_type=="numeric") %>% 
+  rename(variable=skim_variable)  %>% 
+    mutate(across(where(is.numeric), ~ round(.x, digits=1))) 
+```
+
+::: {.content-visible when-format="html"}
+
+```{r}
+#| eval: !expr knitr::is_html_output()
+foobar %>% 
+  gt::gt() 
+```
+
+:::
+
+::: {.content-visible when-format="pdf"}
+```{r}
+#| eval: !expr knitr::is_latex_output()
+foobar %>% 
+  knitr::kable()
+```
+:::
+
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Display graphic summary for each variable.
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+We have to pick some graphical summary of the data. Boxplots and violine plots could be used if we look for concision.
+
+We use histograms to get more details about each column. 
+
+Not that covariates have different meanings:  `Agriculture`, `Catholic`, `Examination`, and `Education` are percentages with values between $0$ and $100$.  
+
+We have no details about the standardized fertility index `Fertility`
+
+`Infant.Mortality` is also a rate:  
+
+> Infant mortality is the death of an infant before his or her first birthday. The infant mortality rate is the number of infant deaths for every 1,000 live births. In addition to giving us key information about maternal and infant health, the infant mortality rate is an important marker of the overall health of a society.
+
+see [Center for Desease Control](https://www.cdc.gov/reproductivehealth/maternalinfanthealth/infantmortality.htm)
+
+We reuse the function we have already developped during previous sessions.
+
+```{r}
+make_biotifoul(swiss, .f = is.numeric)
+```
+
+Histograms reveal that our covariates have very different distributions. 
+
+Religious affiliation (`Catholic`) tells us that there two types of districts, which is  reminiscent of the old principle *Cujus regio, ejus religio* , see [Old Swiss Confederacy](https://en.wikipedia.org/wiki/Old_Swiss_Confederacy). 
+
+`Agriculture` shows that in most districts, agriculture was still a very important activity.
+
+`Education` reveals that in all but a few districts, most children did not receive secondary education. `Examination` shows that some districts lag behind the bulk of districts. Even less exhibit a superior performance.
+
+The two demographic variables `Fertility`  and `Infant.Mortality` look roughly unimodal with a few extreme districts.
+
+
+
+:::::
+
+:::
+
+## Investigate pairwise correlations
+
+::: {.callout-note title="Question"}
+
+- Compute, display and comment the sample correlation matrix
+- Display jointplots for each pair of variables
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+Package `corrr`, functions `correlate` and `rplot` provide a convenient tool.
+
+Note that `corrr::rplot()` creates a graphical object of class `ggplot`.
+We can endow it with more layers.  
+
+```{r}
+#| label: corplot_swiss
+corrr::correlate(swiss) |> 
+  corrr::rplot() + 
+  labs(title="Correlation plot for Swiss Fertility data")
+```
+
+The high positive linear correlation between `Education` and `Examination` is moderately surprising. The negative correlation between the proportion of people involved in `Agriculture` and `Education` and `Examination`is also not too surprising. Secondary schooling required pupils from rural areas to move to  cities. 
+
+A more intriguing observation concerns the pairs `Catholic` and `Examination` (negative correlation) and `Catholic`  and `Education` (little correlation). 
+
+The response variable `Fertility` looks negatively correlated with `Examination` an `Education`. These correlations are worth being further explored. In Demography, the decline of Fertility is often associated with the the rise of women education. Note that `Examination` is about males, and that `Education` does not give details about the way women complete primary education. 
+
+
+
+
+:::::
+
+
+
+:::
+
+
+## Singular Value Decomposition (SVD) 
+
+
+
+::: {.callout-note title="Question"}
+
+- Project the `swiss` dataset  on the covariates (all columns but `Fertility`)
+- Center the projected data using matrix manipulation
+- Center the projected data using `dplyr` verbs 
+- Compare the results with the output of `scale()` with various optional arguments
+- Call the centered matrix `Y`
+   
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+Hand-made centering of the dataframe emphasises the fact that centering is  a linear  operation.
+As a matter of fact, it consists in projecting the data frame on the linear space orthogonal to the constant vector.  
+
+```{r}
+X <- select(swiss, -Fertility) |> 
+    as.matrix()
+
+n <- nrow(X)
+ones <-  matrix(1, nrow = n, ncol=1) 
+
+Y <-  X - (1/n)* (ones  %*%  t(ones) %*% X) 
+```
+
+We can also perform centering using `dplyr` verbs. This can be viewed as computing a window function over a  trivial partition. 
+
+```{r}
+#| eval: false
+swiss |> 
+  select(-Fertility) |>
+  mutate(across(everything(), \(x) x-mean(x)))  
+```
+
+:::::
+
+::::: {.callout-tip}
+
+Anyway, function `scale(X, scale=F)` from base `R` does the job.
+
+:::::
+
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+Check that the ouput of `svd(Y)` actually defines a Singular Value Decomposition.
+
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+`svd(Y)` is a list with $3$ elements (`u,d,v`).
+
+$$
+Y = U \times D \times V^\top
+$$
+
+```{r}
+#| results: markup
+svd_Y <-  svd(Y)
+
+svd_Y %$%   # <1> 
+  (Y - u %*% diag(d) %*% t(v)) %>% 
+  norm(type = "F")   # <2> 
+
+norm( 
+  diag(1, ncol(Y)) - 
+  (svd_Y %$% (t(v) %*% v)), 
+  'F'
+)  # <3>. 
+```
+1. Exposing pipe from `magrittr`
+2. Checking the factorization
+3. Checking that colomns of `v` form an orthonormal family 
+
+:::::
+
+::::: {.callout-tip}
+
+Note that we used the exposing pipe `%$%` from `magrittr` to unpack `svd_Y` which is a list with class `svd`  and members named `u`, `d` and `v`. 
+
+We could have used `with(,)` from base `R`. 
+
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Relate the SVD of $Y$ and the eigen decomposition of $Y^\top \times Y$ 
+
+:::
+
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-tip title="solution"} 
+
+The matrix $1/n Y^\top \times Y$ is the covariance matrix
+of the covariates. 
+
+The spectral decomposition of the symmetric Semi Definite Positive (SDP) matrix  $1/n Y^\top \times Y$ is related with the 
+SVD factorization of $Y$. 
+
+The spectral/eigen decomposition of $Y^\top \times Y$ can be obtained using `eigen()`. 
+
+The eigenspaces of $Y^\top \times Y$ are the right eigenspaces  of $Y$.
+
+```{r}
+#| results: markup
+(t(eigen(t(Y) %*% Y )$vectors) %*% svd_Y$v ) %>% 
+  round(digits=2)
+```
+
+The eigenvalues of $Y^\top \times Y$ are the squared singular values of $Y$
+
+```{r}
+eigen(t(Y) %*% Y )$values - (svd_Y$d)^2
+```
+:::::
+
+
+::: {.callout-caution}
+
+Here, the eigenvectors of $Y^\top \times Y$ coincide with the right singular vectors of $Y$ corresponding to non-zero singular values. Up to sign changes, it is always true when the  non-zero singular values are pairwise distinct. 
+
+:::
+
+:::
+
+
+
+## Perform PCA on covariates
+
+::: {.callout-note title="Question"}
+
+Pairwise analysis did not provide us with a clear and simple picture of the French-speaking districts. 
+
+PCA (Principal Component Analysis) aims at exploring the variations of multivariate datasets around their mean
+(center of inertia). In the sequel, we will perform PCA on the matrix of centered covariates, with and without standardizing the centered columns.  
+
+Base `R` offers `prcomp()`. Call `prcomp()` on the centered covariates
+
+Note that `R` also offers `princomp`
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+We first call `prcomp()` with the default arguments for centering and scaling, that is, we center columns and do not attempt to standardize columns. Name the output `pco`.  
+
+What is the result made of?
+
+
+::::: {.callout-tip title="solution"} 
+
+```{r}
+pco <- swiss |> 
+  select(-Fertility) |> 
+  scale(scale = F) |> 
+  prcomp(scale. = F)
+```
+
+`pco` is a list with 5 members. It as a class attribute `pco`. It is an object of class `prcomp` (function `prcomp()` acts as a constructor for class `pco` just as `lm()` acts as  a constructor for class `lm`). [Class `pco` is an `S3` class](https://adv-r.hadley.nz/s3.html)
+
+```{r}
+rlang::is_list(pco)
+
+attributes(pco)
+
+sloop::s3_class(pco)
+```
+:::::
+
+:::
+
+
+
+
+::: {.callout-note title="Question"}
+
+Check that `prcomp()` is indeed a wrapper for `svd()`.
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::::: {.callout-tip title="solution"} 
+
+
+We first check that the matrix can be recovered from the product of the components of the `prcomp` object. 
+
+```{r}
+#| results: markup
+(Y - pco$x %*% t(pco$rotation )) %>% 
+  round(digits = 2)  %>% 
+  head()
+```
+
+We now check that the `rotation` component is indeed made of the right singular vectors (the $V$ factor)
+```{r}
+#| results: markup
+(svd_Y$v %*% t(pco$rotation )) %>% 
+  round(2) 
+```
+
+The column vectors of component $x$ are pairwise orthogonal. 
+```{r}
+#| results: markup
+(t(pco$x) %*% pco$x) %>% 
+  round(2)  
+```
+
+The `x` component of the  `prcomp` object is  the product of the $U$ and $D$  factors. 
+
+
+```{r}
+norm(pco$x - svd_Y$u %*% diag(svd_Y$d),type="F")
+norm(as.matrix(pco$rotation) -svd_Y$v, type="F")
+```
+
+The connection between $pco$sdev$ and $svd_Y$d$ is somewhat less transparent.
+```{r}
+sum(abs(apply(pco$x, 2, sd) - pco$sdev))
+```
+
+
+The components of `pco$sdev` are the standard deviations of the columns of $U \times D$.
+$$\texttt{pco\$sdev[i]}^2 = \frac{\texttt{svd_Y\$d[i]}^2}{n-1}$$
+
+```{r}
+pco$sdev - svd_Y$d/sqrt(nrow(Y)-1)
+```
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Check that rows and columns of component `rotation` of the result of `prcomp()` 
+have unit norm.
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+
+```{r}
+#| results: markup
+apply(pco$rotation, 2, \(x) norm(x, "2"))
+apply(pco$rotation, 1, \(x) norm(x, "2"))
+```
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Check Orthogonality of $V$ (component `rotation` of the `prcomp` object)
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+#| results: markup
+# checking that pco$rotation is an orthogonal matrix 
+t(pco$rotation) %*% pco$rotation
+pco$rotation %*% t(pco$rotation)
+```
+:::
+:::
+
+
+::: {.callout-note title="Question"}
+
+Make a scatterplot from the first two columns of  the 
+$x$ component of the `prcomp` object. 
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+Objects of class `prcomp` can be handled by generic functions like `plot()` or better `autoplot()`.
+Namely, method `prcomp` for generic S3 function `autoplot()` from `ggplot2` delivers one of classical 
+SVD plots. 
+
+::: {.columns}
+
+::: {.column}
+```{r}
+res <- autoplot(pco) +
+  coord_fixed()
+
+res
+```
+:::
+
+::: {.column}
+
+`autoplot(pco)` is a scatterplot for the dataframe defined by matrix $U \times D$ projected on its first 
+two principal components (first two columns). 
+
+:::
+
+::: 
+
+As `autoplot(pco)` is an instance of class  `ggplot`, it can be annotated, decorated as any other `ggplot` object.
+```{r}
+(
+  res + aes(color=Catholic) # +
+#    labs(subtitle="color='share of catholics'")
+) +
+( 
+  res + aes(color=Education) # +
+#    labs(subtitle="color='% education beyond primary school for draftees'")
+) +
+  patchwork::plot_annotation(
+    subtitle = "Scatterplot on the first two principal components (no column scaling)",
+    title= "Share of catholics can almost be determined from the sign of the first PC",
+    caption = "Swiss  Fertility data from R datasets"
+  )
+```
+
+:::::
+:::
+
+::: {.callout-note title="Question"}
+
+Define a graphical pipeline for the *screeplot*. 
+
+Hint: use function `tidy()` from `broom`, to get the data in the right form from an instance of `prcomp`.
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+The screeplot is a bar plot where each bar corresponds to a  singular value. The bar height is proportional to the square of the corresponding singular value. 
+
+```{r}
+p_screeplot <- . %>%   # <1>
+  broom::tidy(matrix="pcs") %>% { 
+  ggplot(.) +
+  aes(x=PC, y=percent, label=pct_format(1.-cumulative)) +   # <3>
+  geom_text(angle=45, vjust=-1, hjust=-.1) + 
+  geom_col(fill=NA, colour="black") # <2>
+  }
+```
+1. Define a pipeline for building a screeplot
+2. Mind the braces on the right side of the first pipe
+3. `1- percent` tell the reader about the relative Frobenious error achieved by keeping the first components of the SVD expansion. 
+
+```{r}
+pco %>% 
+  p_screeplot() +
+  ylab('Relative squared Frobenius error/Relative squared error') +
+  labs(
+    title="Screeplot for swiss fertility data",
+    subtitle="Keeping the first two components is enough to achieve relative Froebenius relative error 3.3%")
+```
+
+The screeplot is a visualization of the Eckart-Young-Mirsky Theorem. It tells us about the relative errors 
+incurent when approximating the data matrix (with centered columns) by the low rank approximations defined by the 
+truncated SVDs.
+
+
+:::::
+
+:::
+
+::: {.callout-note title="Question"}
+
+Define a function that replicates `autoplot.prcomp()`
+
+Project the dataset on the first two principal components (perform dimension reduction) and build a scatterplot. Colour the points according to the value of  original covariates.  
+
+Hint: use generic function `augment` from `broom`.
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+#| warning: false
+#| message: false
+p <-  pco %>% # <1>
+  broom::augment(swiss) %>% 
+  ggplot() +
+  aes(x=.fittedPC1, y=.fittedPC2, label=.rownames) +
+  geom_point() +
+  coord_fixed() +  # <2>  
+  ggrepel::geom_text_repel() 
+
+(p + 
+  aes(color=Infant.Mortality)) +
+(p + 
+   aes(color=Education)) +
+(p + 
+   aes(color=Examination)) +
+(p + 
+   aes(color=Catholic)) +
+(p + 
+   aes(color=Agriculture)) +
+(p + 
+   aes(color=Fertility)) +  
+plot_layout(ncol = 2) +
+plot_annotation(title="Swiss data on first two PCs" , 
+                subtitle = "centered, unscaled")
+
+```
+
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Apply `broom::tidy()` with optional argument `matrix="v"` or `matrix="loadings"` to the `prcomp` object. 
+
+Comment. 
+
+:::
+
+::: {.callout-note}
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+We can extract factor $V$ from the SVD factorization 
+using generic function `tidy` from package `broom`
+```{r}
+#| results: markup
+pco %>% 
+  broom::tidy(matrix="v") %>% 
+  sample_n(5) |>
+  gt::gt()
+```
+
+The result is a tibble in *long form*. It is worth pivoting the dataframe  into wide form.
+This gives back the rotation matrix. 
+
+```{r}
+#| results: markup
+om <- pco %>% 
+  broom::tidy(matrix="v") %>% 
+  tidyr::pivot_wider(id_cols =column, 
+              names_from = PC, 
+              values_from = value) |> 
+  select(-1) |>
+  as.matrix()
+
+norm((om %*% t(om))-diag(1,5), "F")        
+```
+
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Build the third SVD plot, the so called *correlation circle*. 
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+The correlation circle is built from the *loadings*, that is, from the `rotation` component of the `prcomp` object.
+
+We define a preprocessing function to  transform the rotation object into a proper `tibble` form. 
+```{r}
+prep_co_circle <- function(pco) {
+  r <- pco$rotation
+  as_tibble(r) |> 
+    rename_with(.fn = \(x) gsub('PC', '', x), .cols=everything()) |>
+    mutate(row_id=rownames(r))
+}
+               
+```
+
+The The next virtual graphical object  will be our key tool to build the correlation circle. 
+
+```{r}
+#| label:  co_circle_ppl
+co_circle_ppl <-  (
+    pco %>% 
+    prep_co_circle() %>% 
+    filter(F)
+    ) %>% 
+  ggplot() +
+  aes(x=`1`, y=`2`, label=row_id) +
+  geom_segment(aes(xend=0, yend=0), arrow = grid::arrow(ends = "first")) +
+  ggrepel::geom_text_repel() +
+  coord_fixed() +  # <1>
+  xlim(c(-1.1, 1.1)) + ylim(c(-1.1, 1.1))  +
+  ggforce::geom_circle(aes(x0=0, y0=0, r=1), linetype="dashed") 
+```
+1. important
+  
+::: {.columns}
+::: {.column}
+
+```{r}
+co_circle_ppl %+% (
+  pco %>% 
+  prep_co_circle()
+  )  +
+  labs(title="Correlation circle", 
+          subtitle = "centered, unscaled",
+          caption= "Swiss Fertility dataset")
+```
+:::
+
+
+::: {.column}
+
+The length of each arrow is the length of the projection of the corresponding column of the data matrix
+over the plane generated by the first two rescaled left singular vectors (rescaling by the reciprocal 
+of the singular values).
+
+The first two principal componants (left singular vectors) are highly correlated with columns `Agriculture`
+and `Catholic`. 
+
+:::
+:::
+
+
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Compute PCA after standardizing the columns, draw the correlation circle. 
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+::: {.columns}
+::: {.column}
+```{r}
+pco2 <- select(swiss, -Fertility) |> 
+ prcomp(scale. = T)
+
+co_circle_ppl %+% (
+  pco2 %>% 
+  prep_co_circle()
+  )  +
+  labs(
+    title="Correlation circle", 
+    subtitle = "centered, scaled",
+    caption="Swiss fertility dataset")
+
+```
+:::
+::: {.column}
+
+Scaling columns seriously modify the correlation circle.
+
+:::
+:::
+
+
+:::
+:::
+
+
+
+
+
+
+## Compare standardized and non-standardized PCA
+
+::: {.callout-note title="Question"}
+
+Pay attention to the correlation circles.
+
+1.  How well are variables represented?
+2.  Which variables contribute to the first axis?
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+pco_c <- swiss %>% 
+  select(-Fertility) %>% 
+  prcomp()
+
+pco_cs <- swiss %>% 
+  select(-Fertility) %>% 
+  prcomp(scale.=T, center=T)
+```
+
+```{r}
+(
+  co_circle_ppl %+% 
+  prep_co_circle(pco_c)  +
+  labs(
+    subtitle = "centered, unscaled"
+  )
+) +
+(
+  co_circle_ppl %+%  
+  prep_co_circle(pco_cs) +
+  labs(
+    subtitle = "centered, scaled")
+) +
+  patchwork::plot_annotation(
+        title="Swiss, correlation circle"
+  )
+```
+:::
+:::
+
+
+::: {.callout-note title="Question"}
+
+Explain the contrast between the two correlation circles.
+
+:::
+
+In the sequel we focus on standardized PCA.
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+q <-  autoplot(pco_cs, data=swiss) 
+
+(q + 
+  aes(color=Infant.Mortality)) +
+(q + 
+   aes(color=Education)) +
+(q + 
+   aes(color=Examination)) +
+(q + 
+   aes(color=Catholic)) +
+(q + 
+   aes(color=Agriculture)) +
+(q + 
+   aes(color=Fertility)) +  
+patchwork::plot_layout(ncol = 2) +
+patchwork::plot_annotation(
+    title="Scatterplot on first two PCs", 
+    subtitle = "centered, scaled PCA",
+    caption = "Swiss Fertility dataset")
+
+```
+:::
+:::
+
+
+
+## Provide an interpretation of the first two principal axes
+
+::: {.callout-note title="Question"}
+
+Which variables contribute to the two first principal axes?
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+This comes from the correlation circle. We rely on function `prep_co_circle` and 
+on the graphical pipeline `co_circle_ppl`. 
+
+```{r}
+(
+  co_circle_ppl %+% 
+    prep_co_circle(pco_cs) +
+    ggtitle("Swiss, correlation circle", 
+            subtitle = "centered, scaled")
+)
+```
+:::
+:::
+
+::: {.callout-note title="Question"}
+
+Analyze the signs of correlations between variables and axes?
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+swiss |>   # ggrepel::geom_text_repel(data=df_cocirc, 
+  #                          aes(x= 4* `1`,
+  #                              y= 4 * `2`, 
+  #                              label=column), 
+  #                          color="red")
+  select(-Fertility) |> 
+  corrr::correlate() |> 
+  corrr::shave() |> 
+  corrr::rplot(print_cor = T) +
+  theme_minimal()
+```
+:::
+:::
+
+## Add the `Fertility` variable 
+
+::: {.callout-note title="Question"}
+
+Plot again the correlation circle using the same principal axes as before,
+but add the `Fertility` variable. 
+
+How does  `Fertility` relate with covariates? with principal axes?
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::::: {.callout-tip title="solution"} 
+
+We use 
+$$D^{-1} \times U^\top \times X = V^\top$$
+
+It is enough to multipliy the data matrix by $D^{-1} \times U^\top$ and to 
+pipe the result into the coorelation circle graphical pipeline.
+
+```{r}
+foo <- t(diag(svd_Y$d^(-1)) %*% t(svd_Y$u) %*% as.matrix(scale(swiss, scale=F)))  
+ 
+co_circle_ppl  %+% (
+  as_tibble(foo) |>
+  rename_with(.fn = \(x) gsub('V', '', x), .cols=everything()) |>
+  mutate(row_id=rownames(foo))
+)
+```
+
+:::::
+
+:::
+
+
+
+## Biplot 
+
+::: {.callout-note title="Question"}
+
+The last svd plot (biplot) consists of overlaying the scatter plot of component `x` of the `prcomp` object
+and the correlation circle. 
+
+So the biplot is a graphical object built on two dataframes derived on  components  `x` and `rotation` of the `prcomp`
+objects. 
+
+Design a graphical pipeline. 
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+
+::: {.callout-tip title="solution"} 
+```{r}
+pco <- swiss %>% 
+  select(-Fertility) %>% 
+  prcomp(scale.=T)
+
+df_cocirc <- pco %>% 
+  broom::tidy(matrix="v") %>% 
+  tidyr::pivot_wider(id_cols =column, 
+              names_from = PC, 
+              values_from = value) 
+
+broom::augment(pco, data=swiss) %>% 
+  ggplot() + 
+  geom_point(aes(x=.fittedPC1, 
+                 y=.fittedPC2, 
+                 color=Fertility, label=.rownames)) +
+  coord_fixed() + 
+  ggrepel::geom_text_repel(aes(x=.fittedPC1, 
+                               y=.fittedPC2,
+                               color=Infant.Mortality,
+                               label=.rownames)) + 
+  geom_segment(data=df_cocirc,  
+               mapping=aes(x= 4* `1`, 
+                           y= 4 * `2`, 
+                           linetype=factor(column),
+                           label=column,
+                           xend=0, 
+                           yend=0), 
+               arrow = grid::arrow(ends = "first",
+                                    unit(.1, "inches")
+                                  )) + 
+  scale_color_viridis_c() +
+  xlim(c(-5,5)) + 
+  ylim(c(-5,5)) 
+```
+:::
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+`autoplot.prcomp()` has optional arguments. If set to `True`, logical argument `loadings`
+overlays the scatterplot defined by the principal components with the correlation circle. 
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::: {.callout-tip title="solution"} 
+```{r}
+bip <- autoplot(pco_cs, 
+         data=swiss, 
+         color="Fertility", 
+         loadings = TRUE, 
+         loadings.colour = 'blue',
+         loadings.label = TRUE) +
+  coord_fixed() +
+  labs(
+    title = "Biplot",
+    subtitle = "PCA after centering and scaling",
+    caption = "Swiss Fertility dataset"
+  )
+
+bip
+```
+
+
+
+```{r}
+bip |> plotly::ggplotly()
+```
+:::
+
+:::
+
+ 
+
+::: {.content-hidden}
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+### kmeans
+
+```{r}
+km.2 <- swiss %>%  
+  select(-Fertility) %>% 
+  scale() %>% 
+  kmeans(centers = 2)
+
+make_df_centers <- function(object) { 
+  as.data.frame(object[["centers"]]) %>%
+  tibble::rownames_to_column(var=".cluster")
+}
+
+df_centers.2 <- make_df_centers(km.2)
+```
+:::
+:::
+:::
+
+::: {.content-hidden}
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+```{r}
+km.2.pca <-  swiss %>%  
+  select(-Fertility) %>% 
+  scale() %>% 
+  prcomp() %>% 
+  augment(data=swiss) %>% 
+  select(starts_with(".fittedPC")) %>% 
+  kmeans(centers=2)
+
+df_centers.2.pca <- make_df_centers(km.2.pca)
+```
+
+:::
+:::
+:::
+
+::: {.content-hidden}
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+```{r}
+#| eval: false
+broom::augment(km.2, scale(swiss)) %>%
+  ggplot() +
+  aes(x=Education, y=Infant.Mortality, colour=.cluster) +
+  geom_point(aes()) +
+  stat_voronoi(data = df_centers.2,
+               geom="path"               ) +
+  geom_point(data = df_centers.2,
+             colour = "black",
+             shape="+",
+             size=5) +
+  coord_fixed() +
+  labs(col="Voronoï cells") +
+  labs(
+    title= "Kmeans over Swiss dataset, k=3"
+  )
+```
+:::
+:::
+:::
+
+::: {.content-hidden}
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+whiteside <-  MASS::whiteside
+```
+
+
+```{r}
+whiteside <- whiteside %>% 
+  select(-Insul) %>% 
+  scale() %>% 
+  as_tibble() %>% 
+  rename_with(.fn= ~ str_c( ., "scaled", sep="_")) %>% 
+  bind_cols(whiteside)
+
+km.2 <- whiteside %>% 
+  select(ends_with("scaled")) %>% 
+  kmeans(centers=2)
+
+
+df_centers.2 <-  make_df_centers(km.2)
+```
+:::
+:::
+:::
+
+::: {.content-hidden}
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+```{r}
+#| eval: false
+#| 
+broom::augment(km.2, whiteside) %>%
+  ggplot() +
+  aes(x=Temp_scaled, y=Gas_scaled, colour=.cluster) +
+  geom_point(aes(shape=Insul)) +
+  stat_voronoi(data = df_centers.2,
+               geom="path",
+              outline=data.frame(x=c(-3, 3, 3, -3), 
+                                  y=c(-3, -3, 3, 3))
+               ) +
+  geom_point(data = df_centers.2,
+             colour = "black",
+             shape="+",
+             size=5) +
+  coord_fixed() +
+  labs(col="Voronoï cells") +
+  labs(title="Kmeans over whiteside dataset, k=2")
+
+```
+:::
+:::
+:::
+
+# References 
+
+
+[https://scholar.google.com/citations?user=xbCKOYMAAAAJ&hl=fr&oi=ao](https://scholar.google.com/citations?user=xbCKOYMAAAAJ&hl=fr&oi=ao)
+
+
