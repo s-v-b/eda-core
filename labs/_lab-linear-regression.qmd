@@ -1,0 +1,231 @@
+---
+title: 'LAB: Linear Regression'
+date: "`r Sys.time()`"
+draft: false 
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+format:
+  html:
+    output-file: lab-linear-regression.html
+  pdf:
+    output-file: lab-linear-regression.pdf
+
+
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+# GSS dataset and `gssr` package 
+
+```{r}
+stopifnot(
+  require(gssr),
+  require(gssrdoc),
+  require(tidyverse),
+  require(lobstr),
+  require(rlang)
+)
+```
+
+## General social survey
+
+
+## Exploring the dictionary  `gss_dict`
+
+
+::: {.callout-note title="Question"}
+
+- Get the schema of `gss_dict` from `gssrdoc`
+- What is the class/type of columns `years` ?
+- Extract elements `1..3` from column `years`
+- Have a look at [`tidyr`](https://tidyr.tidyverse.org/articles/nest.html) documentation about *nested* data. 
+- Which variables were used in 1982?  
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+ 
+ ```{r}
+gss_dict |>
+  glimpse(width=50)
+ ```
+
+
+```{r}
+base::class(gss_dict$years)
+rlang::is_bare_list(gss_dict$years)
+is.data.frame(gss_dict$years[[2]])
+is.data.frame(gss_dict$years[[1]])
+```
+
+`gss_dict`  is a *nested* dataframe: column `years` (at least) is of class `list`.
+Indeed `gss_dict$years` is a list, and some of its elements are dataframes. 
+
+
+```{r}
+gssrdoc::gss_dict[2:10, ] |> 
+  dplyr::select(variable, years) |>
+  unnest(years)
+  mutate(across(everything(), str)) |>  
+
+```
+
+
+
+:::
+
+
+::: {.callout-tip}
+
+### 
+
+:::
+:::
+
+
+
+::: {.callout-note title="Question"}
+
+-  Extract the data corresponding to year 1982. 
+-  Save the dataframe/tibble as a parquet file in the 'DATA' subdirectory.
+-  The GSS data comes in a *labelled format*, what does it mean?
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title="Solutioj"}
+
+```{r}
+fpath <- './DATA/gss_1982.parquet'
+
+if (!fs::file_exists(fpath)) {
+  df <- gssr::gss_get_yr(1982)
+  df |>
+    arrow::write_parquet(fpath)
+} else {
+  df <- arrow::read_parquet(fpath)
+}
+```
+
+::: 
+
+
+::: {.callout-note title="Question"}
+
+- Inspect documentation of `gssr`
+- Which demographic variables were used during the 1982 survey?
+- What is the difference between cross-sectional data  and panel data?
+- How would you qualify the 1982 survey?
+- Load `gssrdoc` to have online documentation 
+- Request help about variable `wrkstat`
+- Which are the numerical variables?
+- Have a look at [`gssrdoc` reference page](https://kjhealy.github.io/gssrdoc/reference/index.html)
+- Which column names contain `inc`?
+- Which columns are numerical?
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title="Solution"}
+
+
+```{r}
+var_choice <- c(
+  "sex",
+  "age",
+  "occ",
+  "childs",
+  "coninc",
+  "income",
+  "rincome",
+  "income82",
+  "income82",
+  "size",
+  "educ",
+  "region",
+  "marital",
+  "famgen",
+  "region",
+  "respnum"
+)
+
+cat_vars <- c(
+  "sex",
+  "occ",
+  "income",
+  "rincome",
+  "income82",
+  "size",
+  "educ",
+  "region",
+  "marital",
+  "famgen",
+  "region",
+  "respnum"
+)
+```
+```{r}
+df <- df |>
+  select(all_of(var_choice)) |>
+  mutate(across(all_of(cat_vars), as_factor))  
+```
+
+```{r}
+df |> 
+  gt::gt()
+```
+
+
+```{r}
+arrow::read_parquet(fpath, 
+                    col_select=c(
+    age,
+    sex,
+    wrkstat,
+    hrs2,
+    partyid,
+    vote76,
+    pres76,
+    if76who,
+    vote80, pres80, 
+    if80who,
+    polviews,
+    starts_with("occ"),
+    starts_with("wrk")   
+  )) |>
+  head()
+```
+
+```{r}
+
+```
+::: 
+:::
+
+
+## 
+
+```{r}
+df |>
+  ggplot() +
+  aes(x=age, y=coninc) + 
+  geom_jitter(alpha=.5, size=.2) +
+  scale_y_log10() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+lm(coninc ~ age, df) |> summary()
+```

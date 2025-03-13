@@ -1,0 +1,341 @@
+---
+title: 'LAB: Linear Regression on Whiteside data (2)'
+date: "`r Sys.time()`"
+draft: false 
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+format:
+  html:
+    output-file: lab-linear-regression-whiteside-2.html
+  pdf:
+    output-file: lab-linear-regression-whiteside-2.pdf
+
+
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+
+```{r}
+#| label: setup-packages
+#| echo: true
+#| message: false
+#| warning: false
+#| include: true
+
+# We will use the following packages. 
+# If needed, install them : pak::pkg_install(). 
+stopifnot(
+  require("MASS"),
+  require("isotone"),
+  require("magrittr"),
+  require("lobstr"),
+  require("ggforce"),
+  require("patchwork"), 
+  require("gt"),
+  require("glue"),
+  require("skimr"),
+  require("corrr"),
+  require("GGally"),
+  require("broom"),
+  require("tidyverse"),
+  require("ggfortify"),
+  require("autoplotly")
+)
+```
+
+```{r}
+#| echo: false
+#| include: false
+#| eval: true
+#| label: theming
+#| 
+# Setting the look and feel of our plots
+old_theme <- theme_set(
+  theme_minimal()
+)
+```
+
+```{r}
+data(whiteside)
+```
+
+## Model comparison
+
+
+::: {.callout-note title='Question'} 
+
+For the Whiteside data, build a linear model where the covariates are the interactions of `Insul`  with powers of `Temp` (up to degree 5). 
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+
+ 
+```{r}
+#| label: high-degree-lm
+lm_5 <- whiteside |>
+  mutate(feat=poly(Temp, degree=5, raw=T)) |>
+  select(-Temp) |>
+  rename_with(~ gsub('feat', 'Temp_', .), contains('feat')) %>%
+  lm(Gas ~ Insul*., data=.)
+```
+
+```{r}
+tidy_lmm <- function(lmm){
+  lmm |> 
+  tidy() |>
+  gt::gt() |>
+  gt::fmt_scientific(p.value) |>
+  gt::fmt_number(-p.value, decimals=2) |>
+  gt::tab_caption(glue("Formula: {deparse(lmm$call$formula)}"))
+}
+```
+
+
+```{r}
+lm_5 |> 
+  tidy_lmm()
+```
+
+```{r}
+lm_5 |>
+  glance()
+```
+
+:::
+
+:::
+
+::: {.callout-note title='Question'} 
+ 
+Compare model `Gas ~ Insul* poly(Temp, 5, raw=T)` with models `Gas ~ Insul + Temp` and `Gas ~ Insul * Temp`.
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+ 
+
+```{r}
+lst_formulae <-  c('Gas ~ Insul + Temp', 'Gas ~ Insul * Temp', 'Gas ~ Insul* poly(Temp, 5, raw=T)') |>
+  map(as.formula)
+
+lst_models <- map(lst_formulae, \(x) lm(x, data=whiteside))
+```
+
+
+```{r}
+lst_models |>
+  purrr::map_dfr(glance) |>
+  mutate(form=map_chr(lst_formulae,deparse)) |>
+  relocate(form) |>
+  select(1:7) |>
+  gt::gt() |>
+  gt::fmt_scientific(p.value) |>
+  gt::fmt_number(-p.value, decimals=2) |>
+  gt::fmt_integer(df)
+```
+:::
+
+::: {.callout-note title='Question'} 
+ 
+Comment the diagnostic plots for `Gas ~ Insul* poly(Temp, 5, raw=T)`
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+::: {.callout-tip title='Solution'} 
+
+```{r}
+autoplot(lm_5) 
+```
+ 
+:::
+
+
+:::
+
+::: {.callout-note title='Question'} 
+ 
+In model defined by `Gas ~ Insul* poly(Temp, 5, raw=T)`, which coefficients are deemed to differ significantly from `0` (at level $99\%$)?
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+
+
+```{r}
+tbb_confint <- function(lmm, level=.95) {
+  lmm |>
+  confint(level=level) |>
+  as_tibble() |>
+  mutate(coeff=names(coefficients(lmm))) |>
+  relocate(coeff)   
+}
+```
+
+```{r}
+lm_5 |>
+  tbb_confint(level=.99) |>
+  gt::gt()  |> 
+  gt::fmt_scientific(exp_style = "e1") |>
+  gt::tab_caption(deparse(formula(lm_5)))
+``` 
+ 
+```{r}
+lm_5 |>
+  tbb_confint(level=.95) |> 
+  filter(! (`2.5 %` < 0 & 0 < `97.5 %`))
+```
+
+
+:::
+
+:::
+
+::: {.callout-note title='Question'} 
+
+Pick the *best subset solution* 
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+
+```
+ 
+:::
+
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+Use `stepAIC` from package `MASS` to explore the submodels of `Gas ~ Insul * poly(Temp, 5, raw=T)`.
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+ 
+```{r}
+lm_5 <- lm(Gas ~ Insul * (Temp + I(Temp^2) + I(Temp^3) + I(Temp^4) + I(Temp^5)), whiteside)
+``` 
+
+
+```{r}
+res <- stepAIC(lm_5, trace=T)
+```
+
+
+:::
+ 
+:::
+
+
+## Penalized regression
+
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+::: 
+ 
+:::
+
+## Robust regression
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+ 
+:::
+
+:::
+
+
+## Shape constrained inference
+
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+ 
+```{r}
+gp_whiteside <- whiteside |>
+  group_by(Insul) |>
+  arrange(Temp, .by_group=T) 
+  
+res <- gp_whiteside  |>
+  summarize(gpv=list(- gpava(z=Temp, y=-Gas, ties="secondary")[["x"]]), Temp = list(Temp)) |>
+  unnest(cols=c(gpv, Temp)) 
+``` 
+
+
+```{r}
+gp_whiteside |>
+  bind_cols(res) |>
+  ggplot() +
+    aes(x=`Temp...2`, group=`Insul...1`) +
+    geom_point(aes(y=`Gas`, shape=`Insul...1`)) +
+    geom_step(aes(y=gpv, linetype=`Insul...1`)) +
+    geom_smooth(aes(y=Gas), formula='y ~ x', method="lm", se=F)
+
+```
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+:::
+
+:::

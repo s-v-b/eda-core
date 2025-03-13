@@ -1,0 +1,961 @@
+---
+date: "`r Sys.time()`"
+draft: true 
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+format:
+  html:
+    output-file: lab-gss.html
+  pdf:
+    output-file: lab-gss.pdf
+
+engine: knitr
+---
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| include: false
+#| message: false
+#| warning: false
+require(tidyverse)
+require(patchwork)
+require(httr)
+require(glue)
+require(gssr)
+
+old_theme <- theme_set(theme_minimal())
+```
+
+
+# General Social Survey (GSS)
+
+We  will explore a (small) subset of the [GSS dataset]()
+
+> The GSS has been a reliable source of data to help researchers, students, and journalists monitor and explain trends in American behaviors, demographics, and opinions. You'll find the complete GSS data set on this site, and can access the GSS Data Explorer to explore, analyze, extract, and share custom sets of GSS data.
+
+# Data gathering 
+
+## Download the data 
+
+```{r}
+download_data <-  function(fname,
+                           baseurl = 'https://stephane-v-boucheron.fr/data',
+                           datapath = "./DATA") {
+  fpath <- paste(datapath, fname, sep = "/")
+  
+  if (!file.exists(fpath)) {
+    url <- paste(baseurl, fname, sep = "/")
+    
+    rep <- httr::GET(url)
+    stopifnot(rep$status_code == 200)
+    
+    con <- file(fpath, open = "wb")
+    writeBin(rep$content, con)
+    close(con)
+    
+    print(glue('File "{fname}" downloaded!'))
+  } else {
+    print(glue('File "{fname}" already on hard drive!'))
+  }
+}
+
+```
+
+
+
+```{.r}
+download_data(fname="sub-data.txt")
+```
+```{.r}
+download_data(fname="sub-cdbk.txt")
+```
+
+::: {.callout-note}
+
+Base `R` (package `utils`) offers a function `download.file()`. There is 
+
+```{.r}
+fname <- 'sub-data.txt'
+baseurl <- 'https://stephane-v-boucheron.fr/data'
+download.file(url=paste(baseurl, fname, sep="/"),
+              destfile=paste('./DATA', fname, sep="/"))
+```
+
+There is no need to (always) reinvent the wheel!
+
+:::
+
+## Load the data in your session 
+
+File inspection shows that the data file `sub-data.txt` is indeed a `csv` file
+
+```
+09:01 $ file DATA/sub-data.txt
+DATA/sub-data.txt: CSV text
+```
+
+We do not know the peculiarities of this file formatting. We load it 
+as if fields were separated by coma (`,`, this is an American file). 
+and prevent any type inference by asserting that all columns should be treated as `character` (`c`).
+
+::::: {.content-visible when-profile="solution"}  
+
+
+::: {.callout-note title="Solution}
+
+```{r}
+df <- readr::read_csv("./DATA/sub-data.txt",
+                      col_types = cols(.default = "c")
+                      )
+
+dim(df)
+```
+:::
+
+:::::
+
+Answer the following questions:
+
+- What are the observations/individuals/sample points?
+- What do the columns stand for? 
+- Is the dataset tidy/messy?
+
+Inspect the schema of dataframe (there are 540 columns!)
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+```{.r}
+df |> 
+  glimpse()
+```
+
+:::
+
+:::::
+
+# NULL values 
+
+In the dataframe, NULL are encoded in several ways. From the metadata, we learn 
+
+```
+           VALUE  LABEL
+              .d  don't know
+              .i  iap
+              .j  I don't have a job
+              .m  dk, na, iap
+              .n  no answer
+              .p  not imputable
+              .q  not imputable
+              .r  refused
+              .s  skipped on web
+              .u  uncodeable
+              .x  not available in this release
+              .y  not available in this year
+              .z  see codebook
+              
+Missing-data codes: .d,.i,.j,.m,.n,.p,.q,.r,.s,.u,.x,.y,.z
+```
+
+Using a *brute force* approach, we replace the *missing data codes* with `NA`, not the string `'NA'` but NULL value for character vectors `'NA_character_'`. 
+
+
+We first define a *regular expression* that will allow us to detect  the presence of  *missing data codes* in a string and to replace the *missing data code*  by `'NA_character_'`
+
+The repeated backslashes in `na_patterns` are due to the way `R` handles escape/control characters like `\` or `.` which play an important role in the definition of regular expressions.
+
+```{r}
+na_patterns <- '.d,.i,.j,.m,.n,.p,.q,.r,.s,.u,.x,.y,.z' |> 
+  str_replace_all('\\.', '\\\\.') |> 
+  str_replace_all(',', '|')
+
+na_patterns
+```
+::: {.callout-note}
+
+### Regular expressions 
+
+Regular expressions are a Swiss army knife when dealing with text data. Get acquainted with them. 
+It is useful whenver you work data or edit a file
+
+See [Regular expressions in R](https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html)
+
+This is also useful when programming with `Python` or querying a relational database. 
+
+:::
+
+
+```{r}
+df <- df |> 
+  mutate(across(
+    everything(),
+    \(x) str_replace(x, na_patterns, NA_character_)))  # Anonymous function in Python 4....
+```
+
+
+::: {.callout-note}
+
+Our handling of the *Missing-data codes* is fast, sloppy, and dirty. The occurrence of a specific code, say `.i` rather than `.r` might be a valuable information. For some columns, a specific treatment may be indeed if we do not want to waste information.
+
+:::
+
+
+# Downsizing the data 
+
+Project the dataframe `df` onto columns `year`, `age`, `sex`, `race`, `ethnic`, columns ending with `educ`, ending with `deg`, starting with 
+`dwel`, starting with `income`,  `hompop`, `earnrs`,
+`coninc`, `conrinc`.
+
+Call the resulting dataframe `df_redux`.
+
+Open the metadata file `sub-cdbk.txt` in your favorite editor to get a feeling of the column names meaning and of encoding conventions.
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+df_redux <- df |> 
+  select(`year`, id, age, sex, race, hispanic, ethnic, 
+         ends_with('educ'), 
+         degree, 
+         ends_with('deg'),
+         starts_with('dwel'),
+         contains('income'),
+         hompop,
+         earnrs,
+         coninc,
+         conrinc
+         )
+```
+
+::: {.callout-note}
+
+### Tidy selection
+
+`dplyr::select` allows us to use *helpers* to denote all columns with given type, or with names containing some patterns.  Get acquainted with those helpers. They are time savers.
+
+:::
+
+
+
+```{r}
+df_redux |> 
+  glimpse()
+```
+
+There are still many columns and some of them do not look very exciting.
+:::
+
+:::::
+
+
+## Howm many missing values per column ?
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+```{r}
+null_columns <- df_redux |> 
+  skimr::skim() |> 
+  skimr::yank("character") |> 
+  select(skim_variable, n_missing, complete_rate) |> 
+  arrange(desc(n_missing))
+
+null_columns
+```
+
+
+:::
+
+::: {.callout-note}
+
+### `skimr`
+
+`skimr::` is a package that aims at schematizing the different columns of a dataframe. Columns are handled according to their basetype. The output is made of dataframes for each basetype (`numeric`, `factor`, ...). In each returned dataframe, a row corresponds to a column from the dataframe under investigation. The row contains the column name (as `skim_variable`), the number of missing values (`NA`), the proportion of non-missing values (`Complete rate`) and basetype dependent information.    
+
+[Using `skimr`](https://cran.r-project.org/web/packages/skimr/vignettes/skimr.html)
+
+:::
+
+:::::
+
+## Drop NULL columns
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+```{r}
+to_be_dropped <- null_columns |> 
+  filter(complete_rate < 1e-10) |> 
+  pull(skim_variable)
+
+to_be_dropped
+```
+
+```{r}
+df_redux <- df_redux |> 
+  select(-all_of(to_be_dropped)) 
+
+df_redux |> 
+  glimpse()
+```
+
+
+:::
+
+
+::: {.callout-note}
+
+### `all_of()`
+
+`all_of()` is a helper provided by `dplyr`. It allows us to project on a collection 
+of columns denoted by their names (specified as string).
+
+I would like us to have such a device in SQL
+
+[Tidy selection](https://dplyr.tidyverse.org/reference/dplyr_tidy_select.html)
+
+:::
+
+
+:::::
+
+# Count the number of observations per year
+
+Count for each year 
+
+```{r}
+df_redux |> 
+  count(`year`)
+```
+
+::: {.callout-note}
+
+`count()` is a shortcut for 
+
+```{.r}
+df_redux |> 
+  group_by(`year`)
+  summarize(n=n()) 
+```
+
+In SQL, we would write:
+
+```{.sql}
+SELECT df."year", COUNT(*) AS n
+FROM df_redux AS df
+GROUP BY df."year"
+```
+
+:::
+
+Plot the number of rows per year as a *barplot* 
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note  title="Solution"}
+
+```{r}
+p <- df_redux |> 
+  ggplot() +
+  aes(x=`year`) +
+  geom_bar()  +
+  labs(caption="year as a string")
+
+p
+```
+
+
+:::
+
+
+::: {.callout-caution}
+
+```{r}
+q <- df_redux |> 
+  ggplot() +
+  aes(x=as.numeric(`year`)) +
+  geom_bar()  +
+  labs(caption="year as a numeric")
+
+p + q
+```
+
+Should `year` be handled as a numeric?
+
+:::
+
+:::::
+
+
+
+# Explore columns with name containing `inc` 
+
+Find the number of unique values in each column.
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+```{r}
+skim_inc <- df_redux |> 
+  select(contains('inc')) |> 
+  skimr::skim() |> 
+  skimr::yank("character") 
+
+skim_inc
+```
+
+
+:::
+
+:::::
+
+## What are the unique values in columns whose name contains `income` ?
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+
+
+
+```{r}
+df_redux |> 
+  select(contains("income")) |> 
+  summarise(across(everything(), \(x) paste(sort(unique(x)), collapse=", "))) |> 
+  pivot_longer(cols=everything(),
+               names_to = "col",
+               values_to = "unique_vals")
+```
+
+
+:::
+
+ 
+
+
+:::::
+
+
+
+## Make `income`  and `rincome` a factor
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+df_redux <- df_redux |> 
+  mutate(across(ends_with('income'), as_factor)) 
+
+df_redux |> 
+  select(contains('inc')) |> 
+  glimpse()
+```
+
+:::
+
+:::::
+
+
+
+## Summarize and Visualize the distributions of `income` and `rincome`
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+p_income <- df_redux |> 
+  ggplot() +
+  aes(x=income) +
+  geom_bar() 
+
+p_rincome <- df_redux |> 
+  ggplot() +
+  aes(x=rincome) +
+  geom_bar()
+
+p_income + p_rincome
+```
+
+:::
+
+:::::
+
+
+## The factors need reordering
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+cat(levels(df_redux$rincome))
+
+df_redux$rincome <- fct_relevel(df_redux$rincome, as.character(seq(1,12)))
+
+df_redux$income <- fct_relevel(df_redux$income,
+            as.character(seq(1,12)))
+
+cat(levels(df_redux$rincome))
+```
+
+```{r}
+p_income <- df_redux |> 
+  ggplot() +
+  aes(x=income) +
+  geom_bar() 
+
+p_rincome <- df_redux |> 
+  ggplot() +
+  aes(x=rincome) +
+  geom_bar()
+
+p_income + p_rincome
+```
+
+:::
+
+:::::
+
+## Recode factors 
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+ 
+ We have to search the metadata in order to figure out the way columns like `income` or `rincome` have been encoded.
+ 
+```
+38. Did you earn any income from [OCCUPATION DESCRIBED IN Q2]
+           last year? a. If yes: In which of these groups did your earnings
+           from [OCCUPATION IN Q2] for last year fall? That is, before
+           taxes or other deductions.
+
+           VALUE  LABEL
+               1  under $1,000
+               2  $1,000 to $2,999
+               3  $3,000 to $3,999
+               4  $4,000 to $4,999
+               5  $5,000 to $5,999
+               6  $6,000 to $6,999
+               7  $7,000 to $7,999
+               8  $8,000 to $9,999
+               9  $10,000 to $14,999
+              10  $15,000 to $19,999
+              11  $20,000 to $24,999
+              12  $25,000 or more
+              .d  don't know
+              .i  iap
+              .j  I don't have a job
+              .m  dk, na, iap
+              .n  no answer
+              .p  not imputable
+              .q  not imputable
+              .r  refused
+              .s  skipped on web
+              .u  uncodeable
+              .x  not available in this release
+              .y  not available in this year
+              .z  see codebook
+
+```
+
+Now,  the roadmap is simple: define a encoding table to map values to label (and vice versa), 
+transform columns `income` and `rincome` into `factor` and recode the levels using the encoding table.
+ 
+```{r}
+income_encoding <- tribble(
+ ~VALUE,   ~LABEL,
+               '1',  'under $1,000',
+               '2',  '$1,000 to $2,999',
+               '3',  '$3,000 to $3,999',
+               '4',  '$4,000 to $4,999',
+               '5',  '$5,000 to $5,999',
+               '6',  '$6,000 to $6,999',
+               '7',  '$7,000 to $7,999',
+               '8',  '$8,000 to $9,999',
+               '9',  '$10,000 to $14,999',
+              '10',  '$15,000 to $19,999',
+              '11',  '$20,000 to $24,999',
+              '12',  '$25,000 or more',
+              '.d',  'don not know',
+              '.i',  'iap',
+              '.j',  'I do not have a job',
+              '.m',  'dk, na, iap',
+              '.n',  'no answer',
+              '.p',  'not imputable',
+              '.q',  'not imputable',
+              '.r',  'refused',
+              '.s',  'skipped on web',
+              '.u',  'uncodeable',
+              '.x',  'not available in this release',
+              '.y',  'not available in this year',
+              '.z',  'see codebook'
+)
+
+income_encoding
+```
+```{r}
+income_labels <- income_encoding$VALUE
+names(income_labels) <- income_encoding$LABEL
+```
+ 
+ 
+```{r}
+stopifnot(require(rlang))
+
+df_redux$income_2 <- fct_recode(df_redux$income, 
+                  !!!income_labels)
+
+df_redux$rincome_2 <- fct_recode(df_redux$rincome, 
+                  !!!income_labels)
+
+```
+```{r}
+df_redux |> 
+  count(income_2, rincome_2)
+```
+ 
+```{r}
+p <- df_redux |> 
+  ggplot() +
+  aes(x=income_2) +
+  geom_bar()
+
+q <- p + theme(axis.text.x = element_text(angle = 45)) 
+
+p + q 
+```
+ 
+The right plot looks more readable. 
+
+:::
+
+::: {.callout-note}
+
+### List/vector unpacking in `R`
+
+The second argument of `fct_recode()` uses a very convenient feature provided by package `rlang`: `!!!` (bang-bang-bang), when applied to named vector inside a function call, it unpacks the vector and the named vector  elements behave like keyword arguments of the funtion `fct_recode()`. Very practical if you do not enjoy typing.    
+
+:::
+
+:::::
+
+
+
+# Distribution of `year`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+q1 <- df_redux |> 
+  ggplot() +
+  aes(x=`year`) + 
+  geom_bar()
+```
+
+:::
+
+:::::
+
+
+## Make year an integer column
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+```{r}
+df_redux <- df_redux |> 
+  mutate(`year`=as.integer(`year`)) 
+
+q2 <- df_redux |> 
+  ggplot() +
+  aes(x=`year`) + 
+  geom_bar()
+
+q1 + q2
+```
+
+:::
+
+:::::
+
+
+## Plot `rincome` and `income` distributions with respect to `year`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+
+
+
+```{r}
+df_redux |> 
+  count(`year`, rincome_2) |>
+  group_by(`year`) |> 
+  mutate(n_year=sum(n)) |> 
+  ggplot() +
+  aes(x=rincome_2, y=n/n_year) +
+  geom_col() +
+  facet_wrap(vars(year), ncol=2) +
+  theme(axis.text.x = element_text(angle = 45)) 
+```
+
+:::
+
+:::::
+
+
+## Scatterplot of `conrinc` (`y`) with respect to `coninc`, facet by `sex` 
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+Let us first retype the two columns
+
+```{r}
+df_redux <- df_redux |> 
+  mutate(across(all_of(c("coninc", "conrinc")), as.numeric)) 
+```
+
+Let us summarize them 
+
+```{r}
+df_redux |> 
+  select(where(is.numeric)) |> 
+  skimr::skim() |> 
+  skimr::yank("numeric") |> 
+  select(-n_missing, - complete_rate)
+```
+
+`skimr::skim()` tidies the output of `summary()` for numerical columns.
+
+We compute the numerical summaries of the columns
+
+```{r}
+df_redux$coninc |> summary() 
+
+mean(df_redux$coninc, na.rm = TRUE)
+sd(df_redux$coninc, na.rm=TRUE)
+median(df_redux$coninc, na.rm = TRUE)
+IQR(df_redux$coninc, na.rm= TRUE)
+quantile(df_redux$coninc, probs= c(.25, .5, .75), na.rm = TRUE)
+```
+
+
+```{r}
+df_redux |> 
+  drop_na(coninc, conrinc) |> 
+  filter(sex %in% c("1", "2")) |> 
+  ggplot() +
+  aes(x=coninc, y=conrinc, shape=sex) +
+  facet_wrap(~ sex) +
+  geom_point()
+```
+
+:::
+
+:::::
+
+## Facet histogram for `conrinc` according to `income`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note title="Solution"}
+
+
+
+```{r}
+df_redux |> 
+  drop_na(coninc, conrinc) |> 
+  filter(sex %in% c("1", "2")) |> 
+  ggplot() +
+  aes(x=conrinc) +
+  geom_histogram(aes(y=after_stat(density))) +
+  facet_wrap(~ income_2) 
+```
+
+:::
+
+:::::
+
+
+# TODO
+
+- Retype `age`
+- Distribution of `age` (summary and visualization)
+- Distribution of `age` (summary and visualization) with respect to `sex`
+- Scatterplot of `conrinc` with respect to `age`
+- Boxplot of `conrinc` with respect to `sex`
+
+## Retype `age`
+
+Column `age` should be numeric.
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+```{r}
+df_redux <- df_redux |> 
+  mutate(age=as.numeric(age))  
+```
+
+We could also simply write 
+
+```{.r}
+df_redux$age <- as.numeric(df_redux$age)
+```
+
+:::
+
+:::::
+
+
+## Compute the numerical summary of column `age`
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+The print function for summaries delivers a quick and dirty output
+
+```{r}
+s <- summary(df_redux$age)
+
+class(s)
+
+print(s)
+
+skimr::skim(df_redux$age)
+```
+
+The output of `skim()` is handy, and  it is easily inserted in a report.
+
+The numerical summary delivers
+
+- *location* parameters (mean, median, and quartiles)
+- *scale/spread* parameters (standard deviation, InterQuartile range)
+
+The median and the IQR are considered as *robust* estimators of location and scale.
+
+:::
+
+:::::
+
+
+## Boxplot of age with respect to sex
+
+The `boxplot` delivers a graphical output starting from  the robust estimators (the quartiles) of location and scale. 
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-note}
+
+
+```{r}
+df_redux |> 
+  ggplot() +
+  aes(x=sex, y=age) +
+  geom_boxplot() +
+  ggtitle("Age with respect to sex")
+```
+
+:::
+
+
+:::::
+
+
+## Histogram of age distribution facetted by `sex`
+
+```{r}
+df_redux |> 
+  ggplot() +
+  aes(x=age) +
+  geom_histogram(aes(y=after_stat(density)), fill="white", color="black", bins = 20) +
+  facet_wrap(~ sex, ncol = 1) +
+  ggtitle("Age histogram per sex")
+```
+
+## ECDF of age distribution by sex
+
+
+```{r}
+df_redux |> 
+  ggplot() +
+  aes(x=age, linetype=sex, color=sex) +
+  stat_ecdf() +
+  ggtitle("Age ECDF per sex")
+```
+
+
+
+## Is "not responding to the question about `age`" associated with `sex`?
+
+```{r}
+df_redux |> 
+  select(age, sex) |> 
+  mutate(age=is.na(age)) |> 
+  table() |> 
+  chisq.test()
+```
+##  Scatterplot of `conrinc` with respect to `age`
+
+Play with `geom_jitter`, transparency (alpha), point size, and logarithmic scale for income.
+
+```{r}
+p <- df_redux |> 
+  ggplot() +
+  aes(x=age, y=conrinc)  
+
+p1 <- p + geom_point(size=.1, alpha=.5)
+p2 <- p + geom_jitter(size=.1, alpha=.5)
+p3 <- p + geom_point(size=.1, alpha=.5) + scale_y_log10()
+p4 <- p + geom_jitter(size=.1, alpha=.5) + scale_y_log10()
+
+((p1 + p2) / (p3 + p4) ) + plot_annotation(
+  title= 'Income versus Age'
+)
+```
+
+```{r}
+p4 + ggtitle('Income versus Age')
+```
+
+## Boxplot of `conrinc` with respect to `sex`
+
+
+```{r}
+df_redux |> 
+  ggplot() +
+  aes(x=sex, y=conrinc) +
+  geom_boxplot(varwidth=T) +
+  scale_y_log10() +
+  ggtitle("Income with respect to sex")
+```
+

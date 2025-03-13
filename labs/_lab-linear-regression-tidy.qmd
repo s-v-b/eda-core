@@ -1,0 +1,117 @@
+---
+title: 'LAB: Tidy Linear Regression'
+date: "`r Sys.time()`"
+draft: false 
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+
+format:
+  html:
+    output-file: lab-linear-regression-tidy.html
+  pdf:
+    output-file: lab-linear-regression-tidy.pdf
+
+engine: knitr
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+
+
+```{r}
+stopifnot(
+  require(tidymodels), # metapackage
+  require(tidyverse),  # metapackage
+  require(magrittr),
+  require(car),
+  require(lmtest),
+  require(GGally),
+  require(gridExtra),
+  require(MASS),
+  require(Formula),
+  require(glue),
+  require(here),
+  require(skimr),
+  require(ggrepel),
+  require(ggfortify),
+  require(ggforce),
+  require(gghighlight),
+  require(ggthemes),
+  require(patchwork),  
+  require(vip),
+  require(viridis),
+  require(dotwhisker)  # for visualizing regression results
+)
+
+tidymodels::tidymodels_prefer(quiet = T)
+```
+
+Load the data.
+
+
+```{r}
+#| appendix: true
+#| echo: false
+#| eval: true
+if (! fs::file_exists(here('DATA', 'abalone.data'))) {
+  cat('Download abalone datastet from UC Irvine repo\n')
+  url <- 'https://archive.ics.uci.edu/static/public/1/abalone.zip'
+
+  download.file(url, here('DATA', 'abalone.zip'), mode='wb')
+  cat(`Unzip abalone.zip\n`)
+  unzip(here('DATA', 'abalone.zip'), exdir=here('DATA'))
+}
+```
+
+
+```{r}
+abalone_names <- c(
+  "sex"		,
+	"length"		,
+  "diameter"	,
+  "height"		,
+	"whole_weight"	,
+  "shucked_weight"	,
+  "viscera_weight"	,
+	"shell_weight"	,
+  "rings"		
+)
+```
+```{r load_data, echo=FALSE}
+data_path <- here('DATA', 'abalone.data')
+names_path <-  here('DATA', 'abalone.names')
+
+data_dir <- here('SUJETS_PROJETS', 'TOYDATA')
+
+df <-  readr::read_csv(datapath, col_names=abalone_names)
+
+df |>
+  head()
+```
+
+
+Make columns with less than ten distinct values factors.
+
+[Recommended preprocessing steps](https://www.tmwr.org/pre-proc-table.html)
+
+```{r rec_sanitize}
+rec_sanitize <- recipe(Y ~ ., data = df) %>% 
+  step_string2factor(X1, role="predictor") %>%   
+  step_mutate(X1 = fct_collapse(X1, D="B", E=c("A", "C"))) # %>% 
+  # step_mutate(across(where(is.numeric), ~ na_if(., 0))) %>% 
+  # step_naomit(all_predictors())
+
+
+rec_sanitize <- rec_sanitize %>% 
+  step_dummy(X1) %>% 
+  step_interact(terms = ~  X1_D * X4)
+
+prep_sanitize <-  prep(rec_sanitize)
+# tidy(prep_sanitize)
+```

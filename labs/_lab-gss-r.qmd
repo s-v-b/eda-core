@@ -1,0 +1,442 @@
+---
+date: "`r Sys.time()`"
+draft: true
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+format:
+  html:
+    output-file: lab-gss-r.html
+  pdf:
+    output-file: lab-gss-r.pdf
+
+
+
+toc: true
+toc-depth: 3
+toc-collapse: 1
+toc-title: "ToC"
+
+
+engine: knitr
+---
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| warning: false
+#| message: false
+if (!require(gssr)) {
+  if (!require(remotes)){
+    install.packages("remotes")
+  }
+  remotes::install_github("kjhealy/gssr")
+}
+```
+
+
+```{r}
+#| include: false
+#| message: false
+#| warning: false
+
+require(gssr)
+require(tidyverse)
+require(patchwork)
+require(glue)
+
+old_theme <- theme_set(theme_minimal())
+```
+
+
+### Install and use  package `gssr`
+
+::: {layout="[30,70]"}
+
+::: {#first-column}
+
+We work again with General Social Survey (GSS) data. 
+
+We take advantage of `R` package [`gssr`](https://kjhealy.github.io/gssr/)
+
+```{.r}
+if (!require(gssr)) {
+  if (!require(remotes)){
+    install.packages("remotes")
+  }
+  remotes::install_github("kjhealy/gssr")
+}
+```
+
+
+:::
+
+
+::: {#second-column}
+
+```{r}
+#| echo: false
+knitr::include_url("https://kjhealy.github.io/gssr/", height = 400)
+```
+
+:::
+
+:::
+
+
+
+### Get data for year 2018
+
+The GSS is carried out every two years. It offers both *cross-sectional* data and *panel* data.
+
+Package `gssr` offers a simple way to retrieve yearly data.
+
+```{r}
+#| code-fold: false
+df_2018 <- gssr::gss_get_yr(2018)
+```
+### Inspect the data 
+
+- How many observations?
+- How many variables?
+- Are the data tidy/messy?
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+dim(df_2018)
+```
+
+:::::
+
+### Numerical summaries for `age` and `agekdbrn`
+
+The `2018` data provide (among too many other things) columns named `age` abd `agekdbrn`.
+Get numerical summaries about these two columns.
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+df_2018 |> 
+  dplyr::select(age, agekdbrn) |> 
+  skimr::skim() |> 
+  skimr::yank("numeric")
+```
+:::
+
+Thanks to `gssr`, you can get meta-information about the columns
+
+```{.r}
+?aged
+?agekdbrn
+?sex
+```
+
+
+### How is `sex` encoded? Is it worth recoding it? 
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+df_2018 |> 
+  mutate(sex=as_factor(sex)) |> 
+  skimr::skim(sex) |> 
+  skimr::yank("factor")
+```
+
+:::
+
+### Histogram and density plots for `age` distribution/facet by `sex`
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+p_age <- df_2018 |> 
+  mutate(sex=as_factor(sex)) |> 
+  ggplot() +
+  aes(x=age) +
+  facet_wrap(~ sex, ) 
+
+q_age <- df_2018 |> 
+  mutate(sex=as_factor(sex)) |> 
+  ggplot() +
+  aes(x=age) 
+```
+
+:::::
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+p_age +
+  geom_histogram(aes(y=after_stat(density)),
+                 fill="white", 
+                 color="black",
+                 bins=20) +
+  labs(
+    title="GSS 2018",
+    subtitle = "Age distribution of respondents"
+  )
+```
+
+- Play with number of bins
+- Spot the irregular behavior of the histograms
+- Something special at the right edge of both histograms
+
+
+```{r}
+enframe(x=runif(1000))  |> 
+  ggplot() +
+  aes(x=value) +
+  geom_histogram(bins=10)
+```
+```{r}
+q_age +
+  geom_histogram(aes(y=after_stat(density)),
+                 fill="white", 
+                 color="black",
+                 bins=70) +
+  labs(
+    title="GSS 2018",
+    subtitle = "Age distribution of respondents"
+  )
+```
+
+:::::
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+p_age + 
+  stat_density(aes(y=after_stat(density)),
+               fill="white", 
+               alpha=.5,
+               color="black",
+               bw = "SJ",
+               adjust = 1
+               )
+```
+
+- Play with arguments `bw` and `adjust` of `stat_density`
+- Same comments
+
+:::::
+
+### Compare *sample* `age` distribution with *population* `age` distribution
+
+ 
+::: {layout="[30,70]"}
+
+::: {#first-column}
+
+Sherbrooke University offers visual information about the age structure of population of a wide range of countries.
+
+Following demographic usage, the age structure is presented through an age pyramid.
+
+Note that an age pyramid is a special kind of histogram
+
+:::
+
+::: {#second-column}
+
+```{r}
+#| code-fold: true
+knitr::include_url("https://perspective.usherbrooke.ca/bilan/servlet/BMPagePyramide/USA/2018/?", height=600)
+```
+
+:::
+
+:::
+
+
+::::: {.content-visible when-profile="solution"} 
+:::::
+
+### Parallel boxplots of `age` with respect to `sex`
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+df_2018 |> 
+  mutate(sex=as_factor(sex)) |> 
+  ggplot() +
+  aes(y=age, x=sex) +
+  geom_boxplot(varwidth = T) +
+  xlab("sex")
+```
+
+:::::
+
+### QQplot comparing sample male and female age distributions
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+with(df_2018,
+     qqplot(x=age[sex==1], y=age[sex==2]))
+```
+:::
+
+### Make your own qqplot
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+cdf_age_2018_1 <- ecdf(df_2018$age[df_2018$sex==1])
+
+tb <- df_2018 |> 
+  dplyr::filter(sex==2) |> 
+  dplyr::select(age) |> 
+  mutate(Fn=rank(age, ties.method = "max")/n()) |> 
+  distinct() |> 
+  arrange(age)
+  
+eqf_age_2018_2 <- with(tb,
+     stepfun(x=Fn, y=c(age, max(age)), right = T, f = 1))
+```
+
+```{r}
+filter(df_2018, sex==1) |> 
+  ggplot() +
+  aes(x=age, y=eqf_age_2018_2(cdf_age_2018_1(age))) +
+  geom_point(alpha=.1, fill="white") + 
+  geom_abline(intercept = 0, slope=1, linetype="dotted") +
+  coord_fixed() +
+  xlab("Age (men)") +
+  ylab("Age (women)")
+```
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+
+```
+
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+# data(gss_all)
+```
+
+```{r}
+data("gss_dict")
+```
+
+```{r}
+gss_dict |> 
+  filter(variable=="age")
+```
+```{r}
+# gss_which_years(gss_all, c("age", "agekdbrn"))
+```
+
+
+
+:::::
+
+
+### Scatterplot for `age` and `agekdbrn`, facet by `sex`   `
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+:::::
+
+### Working with `gss_sub`
+
+
+
+```{r}
+data("gss_sub")
+
+gss_sub |> 
+  glimpse()
+```
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+gss_sub |> 
+  head()
+```
+
+
+:::::
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+```{r}
+gss_sub |> 
+  dplyr::select(-id, -year) |> 
+  summarise(across(everything(), n_distinct)) |> 
+  pivot_longer(cols = everything(), names_to="name_col", values_to = "n_distct") |> 
+  arrange(n_distct) |> 
+  filter(n_distct < 15) |> 
+  left_join(gss_dict, by=c("name_col"="variable"))
+```
+:::
+
+### Education through  generations
+
+What kind of information do we get through variables `degree` and `padeg`?
+
+```{.r}
+?degree
+?padeg
+```
+
+### Compute contingency table for `degree` and `padeg`
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+tab_degree_padeg <- gss_sub |> 
+  dplyr::select(degree, padeg) |> 
+  mutate(across(everything(), as_factor)) |> 
+  table()  
+```
+
+```{r}
+tab_degree_padeg |> 
+  chisq.test()
+```
+
+:::
+
+### Visualize contingency table for `degree` and `padeg`
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+```{r}
+tab_degree_padeg |> 
+  t() |> 
+  mosaicplot(color = T)
+```
+:::::
+
+### Rearrange the levels of `degree` and `padeg`
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+:::::
