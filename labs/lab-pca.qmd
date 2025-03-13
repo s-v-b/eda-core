@@ -49,6 +49,11 @@ stopifnot(
 #| 
 
 old_theme <- theme_set(theme_minimal())
+
+options(ggplot2.discrete.colour="viridis")
+options(ggplot2.discrete.fill="viridis")
+options(ggplot2.continuous.fill="viridis")
+options(ggplot2.continuous.colour="viridis")
 ```
 
 
@@ -203,6 +208,7 @@ see [Center for Desease Control](https://www.cdc.gov/reproductivehealth/maternal
 We reuse the function we have already developped during previous sessions.
 
 ```{r}
+#| label: make_biotiful
 make_biotifoul(swiss, .f = is.numeric)
 ```
 
@@ -242,9 +248,13 @@ We can endow it with more layers.
 
 ```{r}
 #| label: corplot_swiss
-corrr::correlate(swiss) |> 
+
+swiss |> 
+    corrr::correlate(use="pairwise.complete.obs",method="pearson", quiet=T) |> 
+  corrr::shave() |> 
   corrr::rplot() + 
-  labs(title="Correlation plot for Swiss Fertility data")
+  labs(title="Correlation plot for Swiss Fertility data") +
+  theme_minimal()
 ```
 
 The high positive linear correlation between `Education` and `Examination` is moderately surprising. The negative correlation between the proportion of people involved in `Agriculture` and `Education` and `Examination`is also not too surprising. Secondary schooling required pupils from rural areas to move to  cities. 
@@ -329,9 +339,7 @@ Check that the ouput of `svd(Y)` actually defines a Singular Value Decomposition
 
 `svd(Y)` is a list with $3$ elements (`u,d,v`).
 
-$$
-Y = U \times D \times V^\top
-$$
+$$Y = U \times D \times V^\top$$
 
 ```{r}
 #| results: markup
@@ -440,7 +448,7 @@ pco <- swiss |>
   prcomp(scale. = F)
 ```
 
-`pco` is a list with 5 members. It as a class attribute `pco`. It is an object of class `prcomp` (function `prcomp()` acts as a constructor for class `pco` just as `lm()` acts as  a constructor for class `lm`). [Class `pco` is an `S3` class](https://adv-r.hadley.nz/s3.html)
+`pco` is a list with 5 members. It as a class attribute `prcomp`. It is an object of class `prcomp` (function `prcomp()` acts as a constructor for class `pco` just as `lm()` acts as  a constructor for class `lm`). [Class `pco` is an `S3` class](https://adv-r.hadley.nz/s3.html)
 
 ```{r}
 rlang::is_list(pco)
@@ -505,7 +513,7 @@ sum(abs(apply(pco$x, 2, sd) - pco$sdev))
 
 
 The components of `pco$sdev` are the standard deviations of the columns of $U \times D$.
-$$\texttt{pco\$sdev[i]}^2 = \frac{\texttt{svd_Y\$d[i]}^2}{n-1}$$
+<!-- $$\verb{pco$sdev}[i]^2 = \frac{\verb{svd_Y$d}[i]^2}{n-1}$$ -->
 
 ```{r}
 pco$sdev - svd_Y$d/sqrt(nrow(Y)-1)
@@ -526,7 +534,7 @@ have unit norm.
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
 
-
+Check that rows and columns of matrix `rotation`  have unit norm.
 ```{r}
 #| results: markup
 apply(pco$rotation, 2, \(x) norm(x, "2"))
@@ -575,7 +583,10 @@ SVD plots.
 ::: {.column}
 ```{r}
 res <- autoplot(pco) +
-  coord_fixed()
+  coord_fixed() +
+  theme_minimal()
+
+ts <- theme_set(theme_minimal())
 
 res
 ```
@@ -593,18 +604,17 @@ two principal components (first two columns).
 As `autoplot(pco)` is an instance of class  `ggplot`, it can be annotated, decorated as any other `ggplot` object.
 ```{r}
 (
-  res + aes(color=Catholic) # +
-#    labs(subtitle="color='share of catholics'")
+  res + aes(color=Catholic) + theme_minimal()
 ) +
-( 
-  res + aes(color=Education) # +
-#    labs(subtitle="color='% education beyond primary school for draftees'")
+(  
+  res + aes(color=Education) + theme_minimal()
 ) +
   patchwork::plot_annotation(
     subtitle = "Scatterplot on the first two principal components (no column scaling)",
     title= "Share of catholics can almost be determined from the sign of the first PC",
     caption = "Swiss  Fertility data from R datasets"
-  )
+  ) 
+  
 ```
 
 :::::
@@ -630,12 +640,14 @@ p_screeplot <- . %>%   # <1>
   ggplot(.) +
   aes(x=PC, y=percent, label=pct_format(1.-cumulative)) +   # <3>
   geom_text(angle=45, vjust=-1, hjust=-.1) + 
-  geom_col(fill=NA, colour="black") # <2>
-  }
+  geom_col(fill=NA, colour="black") + # <2>
+  theme_minimal()
+  } 
+
 ```
 1. Define a pipeline for building a screeplot
 2. Mind the braces on the right side of the first pipe
-3. `1- percent` tell the reader about the relative Frobenious error achieved by keeping the first components of the SVD expansion. 
+3. `1- cumulative` tell the reader about the relative Frobenious error achieved by keeping the first components of the SVD expansion. 
 
 ```{r}
 pco %>% 
@@ -643,7 +655,8 @@ pco %>%
   ylab('Relative squared Frobenius error/Relative squared error') +
   labs(
     title="Screeplot for swiss fertility data",
-    subtitle="Keeping the first two components is enough to achieve relative Froebenius relative error 3.3%")
+    subtitle="Keeping the first two components is enough to achieve relative Froebenius relative error 3.3%") +
+  theme_minimal()
 ```
 
 The screeplot is a visualization of the Eckart-Young-Mirsky Theorem. It tells us about the relative errors 
@@ -677,7 +690,8 @@ p <-  pco %>% # <1>
   aes(x=.fittedPC1, y=.fittedPC2, label=.rownames) +
   geom_point() +
   coord_fixed() +  # <2>  
-  ggrepel::geom_text_repel() 
+  ggrepel::geom_text_repel()  +
+  theme_minimal()
 
 (p + 
   aes(color=Infant.Mortality)) +
@@ -770,7 +784,7 @@ The The next virtual graphical object  will be our key tool to build the correla
 
 ```{r}
 #| label:  co_circle_ppl
-co_circle_ppl <-  (
+co_circle_ppl <- (
     pco %>% 
     prep_co_circle() %>% 
     filter(F)
@@ -780,8 +794,9 @@ co_circle_ppl <-  (
   geom_segment(aes(xend=0, yend=0), arrow = grid::arrow(ends = "first")) +
   ggrepel::geom_text_repel() +
   coord_fixed() +  # <1>
-  xlim(c(-1.1, 1.1)) + ylim(c(-1.1, 1.1))  +
-  ggforce::geom_circle(aes(x0=0, y0=0, r=1), linetype="dashed") 
+  xlim(c(-1.1, 1.1)) + ylim(c(-1.1, 1.1))  + 
+  ggforce::geom_circle(aes(x0=0, y0=0, r=1), linetype="dashed") +
+  theme_minimal()
 ```
 1. important
   
@@ -795,7 +810,8 @@ co_circle_ppl %+% (
   )  +
   labs(title="Correlation circle", 
           subtitle = "centered, unscaled",
-          caption= "Swiss Fertility dataset")
+          caption= "Swiss Fertility dataset") +
+  theme_minimal()
 ```
 :::
 
@@ -839,7 +855,8 @@ co_circle_ppl %+% (
   labs(
     title="Correlation circle", 
     subtitle = "centered, scaled",
-    caption="Swiss fertility dataset")
+    caption="Swiss fertility dataset") +
+  theme_minimal()
 
 ```
 :::
@@ -889,13 +906,16 @@ pco_cs <- swiss %>%
   prep_co_circle(pco_c)  +
   labs(
     subtitle = "centered, unscaled"
-  )
+  ) + 
+  theme_minimal()  
 ) +
 (
   co_circle_ppl %+%  
   prep_co_circle(pco_cs) +
   labs(
-    subtitle = "centered, scaled")
+    subtitle = "centered, scaled"
+  ) +
+  theme_minimal()  
 ) +
   patchwork::plot_annotation(
         title="Swiss, correlation circle"
@@ -917,7 +937,10 @@ In the sequel we focus on standardized PCA.
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
 ```{r}
-q <-  autoplot(pco_cs, data=swiss) 
+q <-  autoplot(pco_cs, data=swiss) +
+  theme_minimal()
+
+ts <- theme_set(theme_minimal())
 
 (q + 
   aes(color=Infant.Mortality)) +
@@ -962,7 +985,8 @@ on the graphical pipeline `co_circle_ppl`.
   co_circle_ppl %+% 
     prep_co_circle(pco_cs) +
     ggtitle("Swiss, correlation circle", 
-            subtitle = "centered, scaled")
+            subtitle = "centered, scaled") +
+  theme_minimal()  
 )
 ```
 :::
@@ -983,7 +1007,7 @@ swiss |>   # ggrepel::geom_text_repel(data=df_cocirc,
   #                              label=column), 
   #                          color="red")
   select(-Fertility) |> 
-  corrr::correlate() |> 
+  corrr::correlate(use="pairwise.complete.obs",method="pearson", quiet=T) |> 
   corrr::shave() |> 
   corrr::rplot(print_cor = T) +
   theme_minimal()
@@ -1019,7 +1043,8 @@ co_circle_ppl  %+% (
   as_tibble(foo) |>
   rename_with(.fn = \(x) gsub('V', '', x), .cols=everything()) |>
   mutate(row_id=rownames(foo))
-)
+) +
+  theme_minimal()  
 ```
 
 :::::
@@ -1079,7 +1104,8 @@ broom::augment(pco, data=swiss) %>%
                                   )) + 
   scale_color_viridis_c() +
   xlim(c(-5,5)) + 
-  ylim(c(-5,5)) 
+  ylim(c(-5,5)) +
+  theme_minimal()
 ```
 :::
 
@@ -1097,6 +1123,9 @@ overlays the scatterplot defined by the principal components with the correlatio
 
 ::: {.callout-tip title="solution"} 
 ```{r}
+#| label: biplot
+#| message: false
+#| warning: false
 bip <- autoplot(pco_cs, 
          data=swiss, 
          color="Fertility", 
@@ -1108,7 +1137,10 @@ bip <- autoplot(pco_cs,
     title = "Biplot",
     subtitle = "PCA after centering and scaling",
     caption = "Swiss Fertility dataset"
-  )
+  ) +
+  theme_minimal()
+
+ts <- theme_set(theme_minimal())
 
 bip
 ```
@@ -1116,8 +1148,63 @@ bip
 
 
 ```{r}
+#| label: biplotly
+#| message: false
+#| warning: false
+bip_plotly <- autoplot(pco_cs, 
+         data=rownames_to_column(swiss, var="district"), 
+         color="Fertility", 
+         text="district", 
+         loadings = TRUE, 
+         loadings.colour = 'blue',
+         loadings.label = TRUE) + 
+  aes(text=district) +
+  coord_fixed() +
+  labs(
+    title = "Biplot",
+    subtitle = "PCA after centering and scaling",
+    caption = "Swiss Fertility dataset"
+  ) +
+  theme_minimal()
+
 bip |> plotly::ggplotly()
 ```
+
+```{r}
+#| label: biplotly-home
+#| message: false
+#| warning: false
+(
+broom::augment(pco, data=rownames_to_column(swiss, var="district")) |> 
+  ggplot() + 
+  geom_point(aes(x=.fittedPC1, 
+                 y=.fittedPC2, 
+                 color=Fertility,
+                 label=district)) +
+  coord_fixed() + 
+  geom_segment(data=df_cocirc,  
+               mapping=aes(x= 4* `1`, 
+                           y= 4 * `2`, 
+                           linetype=factor(column),
+                           label=column,
+                           xend=0, 
+                           yend=0), 
+               arrow = grid::arrow(ends = "first",
+                                    unit(.1, "inches")
+                                  )) + 
+  scale_color_viridis_c() +
+  xlim(c(-5,5)) + 
+  ylim(c(-5,5)) +
+  labs(
+    title = "Biplot",
+    subtitle = "PCA after centering and scaling",
+    caption = "Swiss Fertility dataset"
+  ) +
+  theme_minimal() 
+) |> plotly::ggplotly()
+```
+
+
 :::
 
 :::
@@ -1188,7 +1275,8 @@ broom::augment(km.2, scale(swiss)) %>%
   labs(col="Voronoï cells") +
   labs(
     title= "Kmeans over Swiss dataset, k=3"
-  )
+  ) +
+  theme_minimal()
 ```
 :::
 :::
