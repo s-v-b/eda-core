@@ -29,15 +29,16 @@ engine: knitr
 # We will use the following packages. 
 # If needed, install them : pak::pkg_install(). 
 stopifnot(
+  require("corrr"),
   require("magrittr"),
   require("lobstr"),
   require("ggforce"),
   require("gt"),
   require("glue"),
   require("skimr"),
-  require("corrr"),
   require("patchwork"), 
-  require("tidyverse")
+  require("tidyverse"),
+  require("ggfortify")
   # require("autoplotly")
 )
 ```
@@ -1209,7 +1210,49 @@ broom::augment(pco, data=rownames_to_column(swiss, var="district")) |>
 
 :::
 
+## Generics
+
+`autoplot()` is an example of S3 generic function. Let us examine this function using `sloop`
+
+::: {.callout-note type="Question"}
+
+Use `sloop::s3_dispatch()` to compare `autoplot(prcomp(swiss))` and `autoplot(lm(Fertility ~ ., swiss))`
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::: {.callout-tip title="solution"} 
  
+```{r}
+sloop::ftype(autoplot)
+
+sloop::s3_dispatch(autoplot(prcomp(swiss)))
+sloop::s3_dispatch(autoplot(lm(Fertility ~ ., swiss)))
+```
+
+:::
+
+:::
+
+::: {.callout-note type="Question"}
+
+Use `sloop::s3_getmethod()` to see the body of  `autoplot.prcomp` 
+
+:::
+
+::: {.content-visible when-profile="solution"} 
+
+::: {.callout-tip title="solution"} 
+
+```{r}
+#| collapse: true
+sloop::s3_get_method(autoplot.prcomp)
+```
+
+:::
+:::
+
 
 ::: {.content-hidden}
 
@@ -1244,8 +1287,8 @@ km.2.pca <-  swiss %>%
   select(-Fertility) %>% 
   scale() %>% 
   prcomp() %>% 
-  augment(data=swiss) %>% 
-  select(starts_with(".fittedPC")) %>% 
+  broom::augment(data=swiss) %>% 
+  dplyr::select(starts_with(".fittedPC")) %>% 
   kmeans(centers=2)
 
 df_centers.2.pca <- make_df_centers(km.2.pca)
@@ -1339,6 +1382,7 @@ broom::augment(km.2, whiteside) %>%
 
 # References 
 
+[S3 classes](https://adv-r.hadley.nz/s3.html)
 
 [https://scholar.google.com/citations?user=xbCKOYMAAAAJ&hl=fr&oi=ao](https://scholar.google.com/citations?user=xbCKOYMAAAAJ&hl=fr&oi=ao)
 
