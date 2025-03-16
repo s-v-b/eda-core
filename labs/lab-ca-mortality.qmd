@@ -1,0 +1,1185 @@
+---
+date: "`r Sys.time()`"
+title: "LAB: Correspondance Analysis"
+
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+
+format:
+  html:
+    output-file: lab-ca.html
+  pdf:
+    output-file: lab-ca.pdf
+
+
+engine: knitr
+---
+
+
+```{r}
+#| label: setup-packages
+#| echo: true
+#| collapse: true
+#| message: false
+#| warning: false
+#| include: false
+
+# We will use the following packages. 
+# If needed, install them : pak::pkg_install(). 
+stopifnot(
+  require("testthat"),
+  require("corrr"),
+  require("magrittr"),
+  require("lobstr"),
+  require("sloop"),
+  require("ggforce"),
+  require("gt"),
+  require("glue"),
+  require("skimr"),
+  require("patchwork"), 
+  require("tidyverse"),
+  require("ggfortify"),
+  require("viridisLite")
+  # require("autoplotly")
+)
+```
+
+```{r}
+#| label: setup-theme
+#| message: false
+#| warning: false
+#| include: false
+#| 
+my_minimal_theme <- theme_minimal(
+  base_size=9, 
+  base_family = "Helvetica"
+)
+
+old_theme <- theme_set(
+  my_minimal_theme               
+  )
+
+options(ggplot2.discrete.colour="viridis")
+options(ggplot2.discrete.fill="viridis")
+options(ggplot2.continuous.fill="viridis")
+options(ggplot2.continuous.colour="viridis")
+```
+
+
+{{< include _preamble.qmd >}}
+
+
+
+Besides the usual packages (`tidyverse`, ...),  we shall require 
+`FactoMineR` and related packages.  
+
+```{r}
+#| message: false
+#| warning: false
+#| include: true
+#| code-fold: true
+#| 
+stopifnot(
+  require(FactoMineR),
+  require(factoextra),
+  require(FactoInvestigate)
+)
+```
+
+
+
+Correspondence Analysis  
+=========================
+
+
+## The `mortality`  dataset
+
+The goal is to investigate a possible link between age group and Cause of death.
+We work with dataset `mortality`  from package `FactoMineR`
+
+```{r}
+#| echo: true
+#| collapse: true
+data("mortality", package = "FactoMineR")
+```
+
+```{r}
+#| results: asis
+#help(mortality)
+```
+
+>  A data frame with 62 rows (the different Causes of death) and 18 columns. Each column corresponds to an age interval (15-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84, 85-94, 95 and more) in a year. The 9 first columns correspond to data in 1979 and the 9 last columns to data in 2006. In each cell, the counts of deaths for a Cause of death in an age interval (in a year) is given.
+
+Source
+: [Centre d'épidemiologie sur les Causes  de décès médicales](https://www.cepidc.inserm.fr)
+
+See also EuroStat:
+
+- [Causes of death (hlth_cdeath)  Reference Metadata in Single Integrated Metadata Structure (SIMS)](https://ec.europa.eu/eurostat/cache/metadata/en/hlth_cdeath_sims.htm)
+- 
+
+::: {.callout-note}
+
+### Question
+
+Read the documentation of the `mortality` dataset. Is this a sample? an aggregated  dataset?
+
+If you consider `mortality` as an agregated dataset, can you figure out the organization  of the sample `mortality` was built from?  
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+The `mortality` dataset is an *aggregated* dataset. It has been built from two samples. 
+Each sample was built from the collection of *death certificates* from one calendar 
+year in France (years 1999 and 2006). From each death certificate, two categorical pieces of information were extracted: *age group* of the deceased and a *Cause of death*. Each sample 
+was then grouped by *age group*  and *Cause of death* and counts were computed. This defines a
+two-ways *contingency table* in *long* form. The contingency table in *wide* form is obtained by pivoting: pick column names from column *age group* and values from counts. Column *Cause of depth* provide row names.
+
+The final form of the dataset is obtained by concatenating the two contingency tables along the second axis. 
+
+```{r}
+mortality <- mortality |> 
+    mutate(Cause = rownames(mortality)) |>
+    mutate(Cause = factor(Cause)) |>
+    relocate(Cause)
+```
+
+```{r}
+my_gt <- function(gt_tbl){
+  gt_tbl |>
+  tab_style(
+    style = list(
+      "font-variant: small-caps;"
+    ),
+    locations = cells_body(columns = Cause)
+  ) |>
+  gt::cols_align(
+    align="left",
+    columns=Cause
+  ) 
+
+}
+```
+
+```{r}
+mortality |>
+    select(Cause, ends_with('(06)')) |> 
+    sample_n(10) |>
+    gt::gt() |>
+    my_gt()
+```
+
+:::
+
+:::::
+
+## Elementary statistics and table wrangling
+
+
+Before proceeding to Correspondence  Analysis (CA), let us tidy up the table and draw some elementary plots. 
+
+::: {.callout-note  title="Question"}
+
+- Start by partially *pivoting* `mortality`, so as to obtain a tibble with columns `Cause`, `year`, while keeping all columns named after age groups (tidy up the data so as to obtain a tibble in partially long format). 
+- Use `rowwise()` and `sum(c_cross())` so as to compute the total number of deaths per `year` and `Cause`  in column `total`. This allows to mimic `rowSums()` inside a pipeline. Column `grand_total` is computed using a *window* function over grouping by `Cause`. 
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+mortality_long <- mortality  |> 
+  pivot_longer(
+    cols=-Cause,
+    cols_vary="slowest",
+    names_to=c(".value", "year"),
+    names_pattern="([\\w\\- ]*) \\(([0-9]{2})\\)"
+  )  |> 
+  mutate(year=ifelse(year=='06', 2006, 1979)) |> 
+  rowwise() |> 
+  mutate(total_year=sum(c_across(-c(Cause, year)))) |> 
+  group_by(Cause) |> 
+  mutate(grand_total = sum(total_year)) |> 
+  ungroup()
+```
+
+```{r}
+mortality_long |>
+ slice_sample(n=10) |>
+ gt::gt() |>
+ my_gt() |>
+ gt::tab_caption("A sample of rows from Mortality table in long form")
+```
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+A truly tidy version of the dataset can be obtained from further pivoting.
+
+```{r}
+mortality_tidy <- mortality_long |> 
+  pivot_longer(
+    cols=-c(year,Cause,total_year, grand_total),
+    cols_vary="slowest",
+    names_to=c("age_range"),
+    values_to=c("#deaths")
+) |>
+  mutate(age_range = factor(age_range, levels=sort(unique(age_range)),ordered=T))
+```
+
+```{r}
+mortality_tidy |>
+  sample_n(5) |>
+  gt::gt()
+```
+:::
+
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+Build a bar plot to display the importance of Causes of deaths in France in years 1979 and 2006
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+ 
+```{r}
+th <- theme_get()
+(
+mortality_long |> 
+  mutate(Cause=fct_reorder(Cause, desc(grand_total))) |>
+  mutate(year=as_factor(year)) |>
+  ggplot() +
+  scale_fill_discrete() +
+  aes(x=Cause, 
+      y=total_year, 
+      fill=year) +
+  geom_col(position=position_dodge()) +
+  theme(
+    legend.position="none",
+    axis.text.x=element_blank(), #remove x axis labels
+    axis.ticks.x=element_blank(), #remove x axis ticks
+  ) +
+  labs(
+    title = "Causes of death, France, 1979, 2006",
+    subtitle= "Raw counts"
+  ) +
+  xlab(label=NULL)
+) |>
+  plotly::ggplotly()  
+
+oth <- theme_set(th)
+```
+
+:::
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+Compute and display the total number of deaths in France in years 1979 and 2006.
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+mortality_long |> 
+  group_by(year) |> 
+  summarise(total_deaths = sum(total_year)) |>
+  gt::gt() |>
+  gt::cols_label(
+    year= "Year", 
+    total_deaths = "#Deaths") |>
+  gt::tab_caption("Mortality in France")
+```
+
+::: 
+:::
+
+
+
+
+
+
+::: {.callout-note title="Question"}
+
+Compute the marginal counts for each year (1979, 2006). Compare. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+Counts have already been computed above. 
+
+```{r}
+mortality_long |> 
+  select(Cause, year, total_year, grand_total) |> 
+  pivot_wider(
+    id_cols=c(Cause, grand_total), 
+    names_from = year, 
+    values_from = total_year) |> 
+  rename(Total=grand_total) |> 
+  arrange(desc(Total)) |>
+  gt::gt() |>
+  my_gt()
+```
+ 
+:::
+
+:::::
+
+
+
+
+## Correspondance Analysis
+
+
+::: {.callout-important}
+
+### CA executive summary
+
+- Start from a 2-way contingency table $X$ with $\sum_{i,j} X_{i,j}=N$
+- Normalize $P = \frac{1}{N}X$ (_correspondance matrix_)
+- Let $r$ (resp. $c$) be the row (resp. column) wise sums vector
+- Let $D_r=\text{diag}(r)$ denote the diagonal matrix with row sums of $P$ as coefficients
+- Let $D_c=\text{diag}(c)$ denote the diagonal matrix with column sums of $P$ as coefficients
+
+
++ The _row profiles matrix_ is $D_r^{-1} \times P$
++ The _standardized residuals matrix_ is  $S = D_r^{-1/2} \times \left(P - r c^\top\right) \times D_c^{-1/2}$
+
+CA consists in computing the SVD of the standardized residuals matrix $S =  U  \times D \times V^\top$
+
+From the SVD, we get
+
+- $D_r^{-1/2} \times U$ *standardized coordinates of rows*
+- $D_c^{-1/2} \times V$ *standardized coordinates of columns*
+- $D_r^{-1/2} \times U \times D$ *principal coordinates of rows*
+- $D_c^{-1/2} \times V \times D$ *principal coordinates of columns*
+- Squared singular values: the principal *inertia*
+
+
+When calling `svd(.)`, the argument should be
+$$D_r^{1/2}\times \left(D_r^{-1} \times P \times D_c^{-1}- \mathbf{I}\times \mathbf{I}^\top  \right)\times D_c^{1/2}= D_r^{-1/2}\times \left( P - r \times c^\top  \right)\times D_c^{-1/2}$$
+
+
+:::
+
+
+::: {.callout-important}
+
+
+### CA and extended SVD
+
+As
+$$D_r^{-1} \times P \times D_c^{-1} - \mathbf{I}\mathbf{I}^\top = (D_r^{-1/2} \times U)\times D \times (D_c^{-1/2}\times V)^\top$$
+
+$(D_r^{-1/2} \times U)\times D \times (D_c^{-1/2}\times V)^\top$ is the _extended SVD_ of
+$$D_r^{-1} \times P \times D_c^{-1} - \mathbf{I}\mathbf{I}^\top$$
+with respect to $D_r$ and $D_c$
+
+
+:::
+
+::: {.callout-note}
+
+### Question
+
+Perform CA on the two contingency tables. 
+
+:::
+
+::: {.callout-tip}
+
+You may use `FactoMineR::CA()`. It is interesting to compute the correspondence analysis in your own way, by preparing the matrix that is handled to `svd()` and returning 
+a named list containing all relevant information. 
+
+> Do the Jedi and Sith build their own light sabers? Jedi do. It's a key part of the religion to have a kyber crystal close to you, to build the saber through the power of the force creating a blade unique and in tune with them
+
+{{< fa jedi >}}
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+```{r}
+lst_ca <- list()
+
+for (y in c('79', '06')) {
+  lst_ca[[y]] <- mortality |> 
+    select(ends_with(glue('({y})'))) |> 
+    FactoMineR::CA(ncp=8, graph = F)
+}
+```
+
+
+```{r}
+#| eval: false
+#| code-fold: true
+lst <- map(c('79', '06'), 
+             \(x) select(mortality, ends_with(glue('({x})'))) |>
+             FactoMineR::CA(ncp=8, graph = F)
+           )
+```
+
+
+:::
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+If you did use `FactoMineR::CA()`, explain the organization of the result.
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+The result of `FactoMineR::CA(...)` is a named and nested list with five elements:
+
+`eig`
+: a matrix/array containing enough information to build a screeplot.
+
+`call`
+: a list of 9, containing the call to `CA()`, an object of type `language`, telling (in principle) the user how `CA()` was called. However, this is a *quoted expression*. Here we need to guess the value of `y` in the calling environment understand what's going on. 
+
+```{r}
+lst_ca[[1]]$call$call
+```
+Element `call` also contains the table margin distributions `marge.col` and `marge.row`. The truncation rank `ncp` (number of components) can be assigned before computing the SVD (default value is 5). Element $X$ stores the contingency table that was effectively used for computing Correpondence Analysis. 
+
+`row`
+: Information gathered from SVD to facilitate row profiles analysis. 
+
+`col`
+: a list structured in the same way as element `row`. Used for column profiles analysis
+
+`svd`
+: a list of 3, just as the resuld of `svd()` containing the singular values, the left and right singular vectors of matrix $...$
+
+:::
+
+::: {.callout-warning}
+
+In principle, all relevant information can be gathered from components `svd`, `call.marge.row`, and `call.marge.col`. 
+
+:::
+
+:::::
+
+
+## Screeplots
+
+
+::: {.callout-note}
+
+### Question
+
+Draw screeplots. Why are they useful? Comment briefly. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+ca_79 <- lst_ca[[1]]
+
+ca_79$eig |> 
+  as_tibble() |> 
+  mutate(across(where(is.numeric), ~ round(.x, digits=2))) |> 
+  gt::gt()
+```
+
+:::
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+### Screeplot 
+
+```{r}
+ca_79$eig |> 
+  as_tibble() |> 
+  rownames_to_column(var="PC") |> 
+  rename(percent=eigenvalue, cumulative=`cumulative percentage of variance`) |> 
+  ggplot() + 
+  aes(x=PC, y=percent, label=round(cumulative,2)) +   # <3>
+  geom_text(angle=45, vjust=-1, hjust=-0.1) + 
+  geom_col(fill=NA, colour="black") + # <2>
+  ylab("Squared singular values") +
+  ylim(c(0, .4)) +
+  labs(
+    title="Screeplot for CA",
+    subtitle = "Mortality 1979: Age Group versus Causes of Death"
+  )
+```
+
+:::
+
+
+:::::
+
+## Row profiles analysis
+
+
+::: {.callout-note}
+
+### Question 
+
+Perform row profiles analysis.
+
+What are the classical plots? How can you build them from the output of `FactoMiner::CA`? 
+
+Build the table of row contributions (the so-called $\cos^2$)
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+
+Attribute `row` of objects of class `CA` (exported from `FactoMineR`) is the starting point of any 
+row profiles analysis. 
+
+```{r}
+ca_79_row <- ca_79$row
+```
+
+Attribute `row` is a named list made of $4$ components. 
+:::
+
+
+::: {.callout-tip title='Solution'} 
+  
+`coord`
+: a matrix with named rows and columns. The number of rows of `coord` matches the number of rows of the contingency table (here, the number of possible death Causes). The number of columns matches the rank of the truncated SVD that underlies Correspondance Analysis. Here it is $5$ which also the rank of the standardized contingency table.
+
+> The row principal coordinates are the principal coordinates of each row profile in terms of the principal component. 
+
+The columns of `coord` are pairwise orthogonal in the inner product space defined by `diag(call$marge.row)` (which embodies the marginal probabilities of the so-called Causes of deaths)
+
+```{r}
+x <- ca_79$row$coord
+r <- ca_79$call$marge.row
+
+A <- round(t(x) %*% diag(r) %*% x, 2)
+
+is_diagonal <- function (A, tol=1e-2){
+  norm(diag(diag(A))-A, type='F') <= tol
+}
+
+# We expect A to be diagonal
+is_diagonal(A)
+```
+
+We can recover `row$coord` from the left singular vectors and the singular values:
+
+```{r}
+with(ca_79,   
+  norm(row$coord - with(svd, U %*% diag(vs[1:ca_79$call$ncp])), 'F')
+)
+```
+
+
+```{r}
+prep_rows <- ca_79_row$coord |> 
+  as_tibble() |> 
+  mutate(name= rownames(ca_79_row$coord)) |> 
+  relocate(name) |> 
+  mutate(prop=r, inertia=ca_79_row$inertia) 
+
+prep_rows |> 
+  mutate(across(where(is.numeric), \(x) round(x,2))) |> 
+  gt::gt()
+```
+
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+
+
+`inertia`
+: a numerical vector with length matching the number of rows of `coord`, `contrib` and `cos2`. 
+
+> Inertia is the way CA measures variation between row profiles. Total inertia is the $\chi^2$ statistic divided by sample size. 
+
+
+Row inertia can be obtained by multiplying the row marginal probability by the squared Euclidean norm of 
+the row in the principal coordinate matrix. 
+ 
+```{r}
+with (ca_79_row,
+  sum(abs(r* (rowSums(coord^2)) - inertia))
+)
+```
+
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+`cos2`
+: Coefficients of matrix `cos2` are the share of row inertia from the corresponding cell in `coord`
+
+
+```{r}
+with (ca_79_row,
+  norm((diag(r/inertia) %*% coord^2) - cos2, type='F')
+)
+```
+
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+`contrib`
+: 
+
+Not too surprisingly, `coord`, `contrib`, and `cos2` share the same row names and column names.   
+
+
+```{r}
+sum(ca_79$call$X)
+
+sum((rowSums(ca_79$call$X)/sum(ca_79$call$X) - r)^2)
+```
+
+The Row Profiles are the rows of matrix `R` below
+
+```{r}
+P <- as.matrix(with(ca_79$call, Xtot/N))
+coord <- ca_79_row$coord
+inertia <- ca_79_row$inertia
+
+r <- ca_79$call$marge.row
+c <- colSums(P)
+
+n <- nrow(P)
+p <- ncol(P)
+
+R <- diag(r^(-1)) %*% P 
+
+Q <- R - matrix(1, nrow = n, ncol = n) %*% P
+```
+
+```{r}
+M <- diag(r^(-1)) %*% P %*% diag(c^(-1)) - matrix(1, nrow=n, ncol=p)
+
+n * norm(diag(r^(1/2)) %*% M %*% diag(c^(1/2)), type = "F")^2
+```
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+We can now display a scatterplot from component `coord`. This is called a *Row Plot*. 
+
+```{r}
+p_scat <-  ( 
+  prep_rows |> 
+    ggplot() +
+    aes(x=`Dim 1`, y=`Dim 2`, label=name) +
+    geom_point() +
+    coord_fixed() 
+  ) 
+
+p_scat |> plotly::ggplotly()
+```
+ 
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+With little effort, it is possible to scale the points so as to tell  the reader the relative numerical importance of each Cause of death. Coloring/filling the points using *inertia* also helps: high inertia rows match light-colored points.  
+
+```{r}
+ppp <- prep_rows |> 
+    ggplot() +
+    aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        label=name, 
+        size=prop, 
+        fill=log10(inertia),
+        color=log10(inertia)) +
+    geom_point(alpha=0.75) +
+    scale_size_area() +
+    coord_fixed() +
+    scale_fill_viridis_c(aesthetics=c("fill", "color"), 
+                         guide="colorbar", 
+                         direction = 1) +
+    ggtitle(
+      "Mortality France 1979: Row plot"
+    )
+  
+ppp |> plotly::ggplotly()
+# (ca_79$row)$contrib
+```
+
+:::
+
+:::::
+
+
+::: {.callout-note title='Question'} 
+ 
+Plot the result of row profile analysis using `plot.CA` from `FactoMineR`.
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+#| eval: false
+#| include: false
+#| code-fold: true
+r.drawn <-
+c("Other accidents", "Congenital defects of the circulatory system", 
+"Kidney and urethra disease", "Accidental poisoning", "Tuberculosis", 
+"Other heart disease", "Other tumours", "Other respiratory ailments", 
+"Malignant ovarian tumour", "Road accidents", "Malignant tumour in other parts of the uterus", 
+"Viral hepatitis", "Other malignent tumours", "Infections of the skin and sub-cutaneous cellular tissue", 
+"Malignant tumour of the larynx, trachea, bronchus and lungs", 
+"Meningitis ", "Other psychological and behavioural disorders ", 
+"Cerebrovascular disease", "Other illnesses relating to circulation ", 
+"Other genito-urinary diseases ")
+
+
+c.drawn <-
+c("15-24 (79)", "55-64 (79)", "85-94 (79)", "25-34 (79)", "45-54 (79)", 
+"35-44 (79)", "75-84 (79)", "65-74 (79)")
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+plot.CA(ca_79, 
+        selectRow = r.drawn, 
+        selectCol = c.drawn, 
+        axes = 1:2, 
+        choix = 'CA', 
+        invisible = c('var', 'quali'))  #, title = '', cex = cex)
+```
+
+
+:::::   
+
+
+
+::: {.callout-note title='Question'} 
+ 
+Perform  column profiles analysis
+
+:::
+
+::::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+names(ca_79_row)
+```
+
+:::::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+
+
+```{r}
+age_group_names <-  str_match(rownames(ca_79$col$coord), '([\\w \\-]*) \\(79\\)')[,2]
+
+prep_cols <- ca_79$col$coord |> 
+  as_tibble() |> 
+  mutate(name= age_group_names) |> 
+  relocate(name) |> 
+  mutate(prop=c, inertia=ca_79$col$inertia)
+```
+
+```{r}
+(
+  prep_cols |> 
+    ggplot() +
+    aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        label=name, 
+        size=prop, 
+        fill=log10(inertia),
+        color=log10(inertia)) +
+    geom_point(alpha=0.75) +
+    scale_size_area() +
+    coord_fixed() +
+    scale_fill_viridis_c(aesthetics=c("fill", "color"),direction = 1) +
+    ggtitle(
+      "Mortality France 1979: Col plot"
+    )) |> plotly::ggplotly()
+```
+
+ 
+:::
+
+
+
+:::::
+
+
+## Symmetric plots 
+
+::: {.callout-note title="Question"}
+
+Build the symmetric plots (biplots)  for correspondence analysis of Mortalitity data
+
+:::
+
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.content-visible when-profile='solution'} 
+ 
+### From the shelf 
+
+```{r}
+#| eval: false
+plot.CA(ca_79)
+```
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+
+### {{< fa jedi >}}
+
+```{r}
+(
+prep_rows |> 
+    ggplot() +
+    aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        label=name, 
+        size=prop, 
+        fill=log10(inertia),
+        color=log10(inertia)) +
+    geom_point(alpha=0.75) +
+    scale_size_area() +
+    coord_fixed() +
+    scale_fill_viridis_c(aesthetics=c("fill", "color"),direction = 1) +
+    geom_point(data = prep_cols,
+      aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        label=name, 
+        size=prop, 
+        fill=log10(inertia),
+        color=log10(inertia)
+      ),
+      shape="square",
+      alpha=.5,      
+    )
+) |> plotly::ggplotly()
+```
+
+:::
+
+:::::
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title='Solution'} 
+ 
+It is convenient to use distinct color scales for  rows and columns. 
+
+ 
+```{r}
+(
+prep_rows |> 
+    ggplot() +
+    scale_size_area() +
+    coord_fixed() +
+    aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        text=name, 
+        size=prop, 
+        fill=log10(inertia)) +
+    geom_point(alpha=0.75) +
+    scale_fill_viridis_c(option="D") +
+    geom_point(data = prep_cols,
+      aes(x=`Dim 1`, 
+        y=`Dim 2`, 
+        text=name, 
+        size=prop, 
+        color=log10(inertia)
+      ),
+      shape="square",
+      alpha=.5,      
+    ) +
+    scale_color_viridis_c(option="F") +
+    theme_minimal(
+    )  
+)  |> plotly::ggplotly()
+
+```
+
+:::
+
+:::
+
+## Mosaicplots
+
+::: {.callout-note title="Question"}
+
+Mosaic plots provide an alternative way of exploring contingency tables. They are particularly handy when handling 2-way contingency tables.
+
+Draw mosaic plots for the two contingency tables living inside `mortality` datasets.
+
+
+:::
+
+
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+mortality |> 
+  select(ends_with('(06)')) |> 
+  chisq.test() |> 
+  broom::glance()
+```
+
+
+```{r}
+mortality |> 
+  select(ends_with('(06)')) |> 
+  as.matrix() |> 
+  as.table() |> 
+  mosaicplot(color = T)
+```
+
+:::
+
+:::::
+
+
+::: {.callout-note title="Question"}
+
+Are you able to deliver an interpretation of this Correspondence Analysis?
+
+:::
+ 
+
+Hierarchical clusetring of row profiles 
+----------------------------------------
+
+::: {.callout-note}
+
+### Question
+
+Build the standardized matrix for row profiles analysis. Compute the pairwise distance matrix using the $\chi^2$ distances. Should you work centered row profiles?
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+We use the weighted $\ell_2$ distances defined by the product of the two marginal distributions. The squared distance between the conditional probabilities defined by rows $a$ and $a'$ is 
+$$\sum_{b}  \frac{\left( N_{a,b}/N_{a,.} - N_{a',b}/N_{a',.}\right)^2}{N_{.,b}/N}$$
+
+The $\ell_2$ distance between the rows of the principal coordinates matrix `row$coord` coincides since they are all centered and normalized with respect to $(N_{.,b}/N)$. 
+
+
+```{r}
+dist_Causes_79 <- ca_79$row$coord[,1:8] |> 
+  dist()
+```
+
+
+
+```{r}
+hc_79 <- hclust(dist_Causes_79, method = "single")
+```
+
+```{r}
+stopifnot(
+  require(ggdendro),
+  require(dendextend),
+  require(sloop)
+)
+```
+
+The instance of `hclust` is transformed into a an object of class `dendro`.
+Class `dendro` is equipped with a variety of functions/methods for analyzing, visualizing, and exploiting the result of `hclust()`. 
+
+```{r}
+dendro_79 <- dendro_data(hc_79)
+```
+
+```{r}
+class(dendro_79)
+```
+
+```{r}
+(
+dendro_79 |> 
+  ggdendrogram(
+    leaf_labels = T, 
+    rotate = T) + 
+  ggdendro::theme_dendro() +
+  scale_y_reverse()
+  ) |> plotly::ggplotly()
+```
+
+```{r}
+
+```
+
+
+:::::
+
+::: {.callout-note}
+
+
+
+:::
+
+
+
+::: {.callout-note}
+
+### Question
+
+Perform hierarchical clustering of row profiles with method/linkage `"single"`. Check the definition of the method. Did you know the underlying algorithm? If yes, in which context did you get acquainted with this algorithm?
+
+
+:::
+
+::: {.callout-note}
+
+### Question
+
+Choose the number of classes (provide justification).
+
+
+:::
+
+::: {.callout-note}
+
+### Question
+
+Can you explain the size of the different classes in the partition?
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+:::::
+
+Atypical row profiles
+---------------------
+
+::: {.callout-note}
+
+### Question
+
+Row profiles that do  not belong to the majority class are called *atypical*. 
+
+1. Compute the share of inertia of atypical row profiles. 
+
+1. Draw a symmetric plot (biplot) outlining the atypical row profiles. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+:::::
+
+
+Investigating independence/association
+----------------------
+
+::: {.callout-note}
+
+### Question 
+
+1.  Calculate the theoretical population table for `deces`. Do you    possible to carry out a chi-squared test?
+
+1.  Perform a hierarchical classification of the line profiles into two
+    classes.
+
+3.  Merge the rows of `deces` corresponding to the same class (you can use the
+    the `tapply` function), and perform a chi-square test.
+    chi-square test. What's the conclusion?
+
+4.  Why is it more advantageous to carry out this grouping into two
+    classes compared to arbitrarily grouping two classes,
+    in order to prove the dependence between these two variables?
+
+:::
+
+
+About the "average profile"
+---------------------------------
+
+::: {.callout-note}
+
+### Question
+
+1.  Represent  individuals from the  majority class. Do they all seem to you to correspond to an average profile?
+
+1.  Try to explain this phenomenon considering the way in which    hierarchical classification uses the Single Linkage method.
+
+:::
+
+
+
+
+::: {.callout-caution}
+
+### Caveat
+
+The `mortality` dataset should be taken with  grain of salt. Assigning a single *Cause* to every death is not a trivial task. It is even questionable: if somebody dies from some infection beCause she could not be cured using an available drug due to another preexisting pathology, who is the culprit? 
+
+:::
