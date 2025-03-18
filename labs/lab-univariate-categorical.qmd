@@ -144,7 +144,11 @@ The `fs` package contains a number of useful functions for handling files and di
 #| eval: true
 #| echo: true
 #| collapse: true
+#| message: false
+#| warning: false
+
 if (!fs::dir_exists('./DATA')) {
+  warning(glue::glue("Creating directory ./DATA in {getwd()}"))
   fs::dir_create('./DATA')
 }
 ```
@@ -164,9 +168,19 @@ Download file `Recensement` from URL `https://stephane-v-boucheron.fr/data/Recen
 
 ```{r}
 #| message: false
-download.file('https://stephane-v-boucheron.fr/data/Recensement.csv', 
-              "./DATA/Recensement.csv")
-df <- readr::read_table("./DATA/Recensement.csv")    # check that the path is correct
+#| warning: false
+
+if (!fs::file_exists("./DATA/Recensement.csv")) {
+  warning("Downloading Recensement.csv from  https://stephane-v-boucheron.fr/data/Recensement.csv")
+  download.file('https://stephane-v-boucheron.fr/data/Recensement.csv', 
+                "./DATA/Recensement.csv")
+  warning("Downloaded!!")
+}
+
+df <- readr::read_table("./DATA/Recensement.csv")
+
+df %>% 
+  glimpse()
 ```
 
 Have a glimpse at the dataframe

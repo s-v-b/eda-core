@@ -1,0 +1,110 @@
+---
+title: "Hmw II: Regression, Package Development"
+date: "2025-03-18"
+engine: knitr
+
+execute:
+  echo: true
+  eval: false
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-dev-2025.html
+  pdf:
+    output-file: hmw-dev-2025.pdf
+
+draft: false
+prefer-html: true
+---
+
+::: {.callout-important}
+
+- Due : April 27 2025
+- Work in pairs
+- {{< fa brands github >}} Deliver your work through a github  repository
+- {{< fa desktop >}} Present your work (10 minutes) on 2025-04-29 between 11:00 and 13:00 (Olympe de Gouges 358)
+
+:::
+
+
+### {{< fa map >}} Objectives
+
+This homework is about  
+
+1. developping methods  for objects produced by  functions  like `gpava()` and `activeSet()` from package `isotone` (`R`)
+2. applying monotone regression techniques to a dataset.  
+
+```{r useful-pkg, include=FALSE}
+#| message: FALSE
+#| warning: FALSE
+#| eval: true
+
+stopifnot(
+  require(tidyverse),
+  require(glue),
+  require(patchwork),
+  require(gt),
+  require(ggforce)
+)
+```
+
+I\. **Supplementing the `broom` and the `ggfortify` packages**
+
+The [`broom` package](https://broom.tidymodels.org) offers `S3` generic functions for 
+building dataframes from the output of a variety of statistical techniques (for example `lm`, `prcomp`, or `kmeans`): `augment()`, `tidy()`, and `glance()`.
+
+The first goal of this homework is to  design and code methods for generic functions `augment`, `tidy`, `glance`, and `autoplot` 
+for classes `gpava` and `activeSet` defined in the [`isotone` package (monotone regression)](https://cran.r-project.org/web/packages/isotone/index.html). 
+
+Package `ggplot2` offers a generic function `autoplot()`. See [Tidyverse documentation on `autoplot`](https://ggplot2.tidyverse.org/reference/autoplot.html).  Package ['ggfortify'](https://cran.r-project.org/web/packages/ggfortify/index.html) offers a large collection of methods for `autoplot`. 
+
+More generally  have a look at [automatic plotting](https://ggplot2.tidyverse.org/reference/automatic_plotting.html)
+Also have a look at `autolayer()` generic in `ggplot2`. 
+
+{{< pagebreak >}}
+
+
+II\. **Applying  monotone regression methods to real data**
+
+The `Abalone` dataset can be obtained from   [UIC Machine learning repository site](https://archive.ics.uci.edu/ml/datasets/Abalone)
+The usual problem consists in predicting *age* (*rings*) as a function of the other variables (this is a regression problem). 
+
+You are expected to conduct exploratory analysis on this dataset. Besides linear regression of the response variable with respect to the others, you shall fit a *monotone regression* function to the dataset. Use the functions developped in the first part of the homework  to discuss your results.
+
+Use the `quarto` package for reproducible research to write your report.
+
+The report should be rendered at least in HTML format, and possibly also in PDF format. 
+
+### Package development
+
+The function and methods coded in this homework should be delivered as a `package`.
+
+Follow the package development guidelines in [R Packages (2e)](https://r-pkgs.org).
+
+- Define a dedicated rstudio project for this homework
+- Don't forget documentation and testing
+  
+### References
+
+- [Advanced R Programming](https://adv-r.hadley.nz)
+  - [Functional programming](https://adv-r.hadley.nz/functionals.html) 
+  - [S3](https://adv-r.hadley.nz/s3.html)
+  - [Meta programming](https://adv-r.hadley.nz/metaprogramming.html)
+- [Packages](https://r-pkgs.org)
+- [Programming with/for `ggplot2`](https://ggplot2-book.org)
+- [Programming with `dplyr`](https://dplyr.tidyverse.org/articles/programming.html)
+- [`tidyeval` helpers](https://ggplot2.tidyverse.org/reference/tidyeval.html)
+- [Cheatsheets](https://posit.co/resources/cheatsheets/)
+- [Package `isotone` on CRAN](https://cran.r-project.org/web/packages/isotone/index.html)
+
+
+{{< pagebreak >}}
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+| Documentation/Report | `r scales::label_percent()(8/20)` | English/French {{<  fa pen-fancy >}} |
+| Testing  | `r scales::label_percent()(5/20)` |  {{<  fa check >}}|
+| Coding   | `r scales::label_percent()(7/20)` |    {{<  fa code >}} |
+
+: {{<  fa graduation-cap >}} Grading criteria 

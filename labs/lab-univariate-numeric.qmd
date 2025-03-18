@@ -107,7 +107,19 @@ getwd()
 #| mesage: false
 #| collapse: true
 #| label: data-load
-#| 
+
+if (!fs::dir_exists('./DATA')) {
+    warning(glue::glue("Creating directory ./DATA in {getwd()}"))
+    fs::dir_create('./DATA')
+  }
+
+if (!fs::file_exists("./DATA/Recensement.csv")) {
+  warning("Downloading Recensement.csv from  https://stephane-v-boucheron.fr/data/Recensement.csv")
+  download.file('https://stephane-v-boucheron.fr/data/Recensement.csv', 
+                "./DATA/Recensement.csv")
+  warning("Downloaded!!")
+}
+
 df <- readr::read_table("./DATA/Recensement.csv")
 
 df %>% 
