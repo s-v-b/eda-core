@@ -91,43 +91,106 @@ stopifnot(
 
 
 
-Multiple sCorrespondence Analysis  
+Multiple Correspondence Analysis  
 =========================
 
 
-## The `mortality`  dataset
+## The `GSS`  dataset
 
-The goal is to investigate a possible link between age group and Cause of death.
-We work with dataset `mortality`  from package `FactoMineR`
 
 ```{r}
-#| echo: true
-#| collapse: true
-data("mortality", package = "FactoMineR")
+stopifnot(
+  require("gssr"),
+  require("gssrdoc")
+)
 ```
 
 ```{r}
-#| results: asis
-#help(mortality)
+data(gss_dict)
+data(gss_panel_doc)
 ```
 
->  A data frame with 62 rows (the different Causes of death) and 18 columns. Each column corresponds to an age interval (15-24, 25-34, 35-44, 45-54, 55-64, 65-74, 75-84, 85-94, 95 and more) in a year. The 9 first columns correspond to data in 1979 and the 9 last columns to data in 2006. In each cell, the counts of deaths for a Cause of death in an age interval (in a year) is given.
+```{r}
+?gss_panel_doc
+```
 
-Source
-: [Centre d'épidemiologie sur les Causes  de décès médicales](https://www.cepidc.inserm.fr)
+```{r}
+gss_panel_doc |> 
+  dplyr::sample_n(5) |> 
+  select(id, text)  |> 
+  gt::gt()
+```
 
-See also EuroStat:
+In the panel questionnaire, some questions have `race` in the field `id`. 
 
-- [Causes of death (hlth_cdeath)  Reference Metadata in Single Integrated Metadata Structure (SIMS)](https://ec.europa.eu/eurostat/cache/metadata/en/hlth_cdeath_sims.htm)
-- 
+```{r}
+#| eval: false
+?race
+```
+
+```
+Question 24. What race do you consider yourself?
+```
+
+| Year | Black  | Other | White | iap (NA) | Total| 
+|-----:|-------:|------:|------:|-------:|-------:|
+| 2010 |	311   |	183	  | 1550  |	     - |	 2044 |
+| 2012 |  301	  | 196	  | 1477	|      - |	 1974 |
+| 2014 |	386	  | 262   |	1890	|      - |	 2538 |
+
+(this is just an excerpt)
+
+
+```{r}
+gss_panel_doc |> 
+  filter(str_detect(id, "race")) |>
+  slice_sample(n=1, by=text) |> 
+  select(id, description, text) |> 
+  gt::gt()
+```
+
+
+```{r}
+data("gss_panel10_long")
+
+gss_panel10_long 
+```
+
+
+```{r}
+gss_panel10_long  |>  
+  filter(wave==3, !is.na(id)) |>
+  select(firstid, wave, id, sex)
+```
+
+
+```{r}
+gss_panel10_long |> 
+  select(wave, id) |>
+  group_by(wave) |>
+  summarize(observed = n_distinct(id),
+            missing = sum(is.na(id)))
+```
+
+
+### Topics
+
+A number of questions are related to the *confidence* topic
+
+```{r}
+gss_panel_doc |> 
+  filter(str_detect(text, "confidence")) |>
+  slice_sample(n=1, by=text) |> 
+  select(id, description, text) |> 
+  gt::gt()
+```
+
 
 ::: {.callout-note}
 
 ### Question
 
-Read the documentation of the `mortality` dataset. Is this a sample? an aggregated  dataset?
-
-If you consider `mortality` as an agregated dataset, can you figure out the organization  of the sample `mortality` was built from?  
+From the `gss_panel10_long` dataset, extract columns corresponding to questions from the *confidence topic*
 
 :::
 
@@ -136,114 +199,184 @@ If you consider `mortality` as an agregated dataset, can you figure out the orga
 
 ::: {.callout-tip title='Solution'} 
  
- 
-The `mortality` dataset is an *aggregated* dataset. It has been built from two samples. 
-Each sample was built from the collection of *death certificates* from one calendar 
-year in France (years 1999 and 2006). From each death certificate, two categorical pieces of information were extracted: *age group* of the deceased and a *Cause of death*. Each sample 
-was then grouped by *age group*  and *Cause of death* and counts were computed. This defines a
-two-ways *contingency table* in *long* form. The contingency table in *wide* form is obtained by pivoting: pick column names from column *age group* and values from counts. Column *Cause of depth* provide row names.
-
-The final form of the dataset is obtained by concatenating the two contingency tables along the second axis. 
-
 ```{r}
-mortality <- mortality |> 
-    mutate(Cause = rownames(mortality)) |>
-    mutate(Cause = factor(Cause)) |>
-    relocate(Cause)
+confidence_ids <- gss_panel_doc |> 
+  filter(str_detect(text, "confidence")) |>
+  slice_sample(n=1, by=text) |> 
+  pull(id)
+
+gss_panel10_long |> 
+  filter(wave==1) |>
+  select(firstid, wave, id, sex, contains(confidence_ids)) |>
+  sample_n(10) |>
+  gt::gt()
 ```
 
-```{r}
-my_gt <- function(gt_tbl){
-  gt_tbl |>
-  tab_style(
-    style = list(
-      "font-variant: small-caps;"
-    ),
-    locations = cells_body(columns = Cause)
-  ) |>
-  gt::cols_align(
-    align="left",
-    columns=Cause
-  ) 
-
-}
-```
 
 ```{r}
-mortality |>
-    select(Cause, ends_with('(06)')) |> 
-    sample_n(10) |>
-    gt::gt() |>
-    my_gt()
+gss_panel_doc |>
+  filter(id %in% confidence_ids) |> 
+  select(-ends_with("2"), -ends_with("3")) |>
+  gt::gt()
 ```
+
+Levels labels for answers to confidence questions are:
+
+Missing-data codes are `0,8,9`
+
+```{r}
+foo <- gss_panel_doc |>
+   filter(id %in% confidence_ids) |> 
+   select(-ends_with("2"), -ends_with("3")) |> 
+   unnest(
+    cols=c(properties_1), names_repair = "universal") |> 
+   unnest(
+    cols=c(marginals_1), names_repair = "universal") |> 
+  
+   head(6) |> 
+  gt::gt()
+   pull(marginals_1)
+
+foo[[1]] |> gt::gt()
+```
+
+- `IAP` stands for 
+- `DK` stands for *Don't Know*
 
 :::
 
 :::::
 
+## The case for using MCA 
+
+> In order to construct a *field of ideological and political attitudes*, which will subsequently
+be used as a reference for locating the empirical typologies of response styles and survey
+compliance, we apply *multiple correspondence analysis* (MCA). MCA belongs to the
+family of techniques used in geometric data analysis (Le Roux and Rouanet 2004). It
+allows for the extraction of the most important dimensions in a set of categorical variables,
+and the graphical representation of variable categories and individuals relative to each
+other in a coordinate system. Distances between categories as well as individuals can be
+interpreted as a measure of (dis)similarity: If categories often co-appear in individual's
+responses, they are located close together in the space produced by MCA. Rare co-appearances, 
+accordingly, result in a larger distance between the respective categories.
+Furthermore, *illustrative variables* can passively be projected into the field, a technique that
+has been termed *visual regression analysis* (Lebart et al. 1984). Whereas the space is
+determined by the distances between the categories of *active variables*, *passive variables*
+do not alter the structure of the constructed field, but appear in their average and hence
+most likely position.
+
+From [https://doi.org/10.1007/s11135-016-0458-3](https://doi.org/10.1007/s11135-016-0458-3)
+
+
+
+## US field of ideological dispositions
+
+
+```{r}
+panel_doc <- gssrdoc::gss_panel_doc
+```
+
+
 ## Elementary statistics and table wrangling
 
 
-Before proceeding to Correspondence  Analysis (CA), let us tidy up the table and draw some elementary plots. 
+Before proceeding to Multiple Correspondence  Analysis (CA), let us select the set of active variables.
 
 ::: {.callout-note  title="Question"}
 
-- Start by partially *pivoting* `mortality`, so as to obtain a tibble with columns `Cause`, `year`, while keeping all columns named after age groups (tidy up the data so as to obtain a tibble in partially long format). 
-- Use `rowwise()` and `sum(c_cross())` so as to compute the total number of deaths per `year` and `Cause`  in column `total`. This allows to mimic `rowSums()` inside a pipeline. Column `grand_total` is computed using a *window* function over grouping by `Cause`. 
+- Project `gss_panel10_long` on `firstid, wave, id, sex,`  and columns with names in 
+
+```
+  confinan conbus conclerg coneduc confed conlabor conpress conmedic contv conjudge consci conlegis conarmy
+```
+
 
 :::
 
 ::: {.content-visible when-profile='solution'} 
  
 ::: {.callout-tip title='Solution'} 
- 
+
+
 ```{r}
-mortality_long <- mortality  |> 
-  pivot_longer(
-    cols=-Cause,
-    cols_vary="slowest",
-    names_to=c(".value", "year"),
-    names_pattern="([\\w\\- ]*) \\(([0-9]{2})\\)"
-  )  |> 
-  mutate(year=ifelse(year=='06', 2006, 1979)) |> 
-  rowwise() |> 
-  mutate(total_year=sum(c_across(-c(Cause, year)))) |> 
-  group_by(Cause) |> 
-  mutate(grand_total = sum(total_year)) |> 
-  ungroup()
+confidence_panel10 <- gss_panel10_long |> 
+  filter(wave==1) |>
+  select(firstid, wave, id, sex, contains(confidence_ids)) |>
+  mutate(across(starts_with("con"), as_factor)) 
 ```
 
 ```{r}
-mortality_long |>
- slice_sample(n=10) |>
- gt::gt() |>
- my_gt() |>
- gt::tab_caption("A sample of rows from Mortality table in long form")
-```
+confidence_10 <- gss_panel_doc |>
+   filter(id %in% confidence_ids) |> 
+   select(-ends_with("2"), -ends_with("3")) |> 
+   unnest(
+    cols=c(properties_1), names_repair = "universal") |> 
+   unnest(
+    cols=c(marginals_1), names_repair = "universal") |>
+   mutate(text=str_squish(text)) |>
+   mutate(text= str_match(text, "\\? [\\w]\\.(.*)")) |> 
+   mutate(text=text[,2]) |> 
+   filter(property == "Missing-data codes") |>
+   select(-starts_with("id"), -property, -`value...5`)
 
-:::
-
-
-::: {.callout-tip title='Solution'} 
- 
-A truly tidy version of the dataset can be obtained from further pivoting.
-
-```{r}
-mortality_tidy <- mortality_long |> 
-  pivot_longer(
-    cols=-c(year,Cause,total_year, grand_total),
-    cols_vary="slowest",
-    names_to=c("age_range"),
-    values_to=c("#deaths")
-) |>
-  mutate(age_range = factor(age_range, levels=sort(unique(age_range)),ordered=T))
 ```
 
 ```{r}
-mortality_tidy |>
-  sample_n(5) |>
+levels_table <- confidence_10 |> 
+  filter(label!='Total' | is.na(label)) |>
+  distinct(`value...9`, label)
+
+```
+
+> If respondents were not given the opportunity to provide a response to a question 
+> because it was not included in the survey they were administered, then their responses are coded as “IAP.”
+
+
+```{r}
+confidence_panel10 |>
+  skimr::skim(where(is.factor)) |>
+  select(-factor.ordered, -skim_type)|>
+  filter(str_starts(skim_variable,"con")) |>
+  gt::gt() |>
+  gt::fmt_number(decimals=3) |>
+  gt::tab_caption(
+    caption = "GSS Panel data 2010 First wave, Topic confidence"
+  )
+```
+
+
+
+```{r}
+confidence_panel10 |>
+  filter(is.na(conarmy)) |>
+  filter(is.na(conclerg)) |>
+  filter(is.na(conpress))
+```
+
+
+```{r}
+confidence_data <- confidence_panel10 |> 
+  mutate(across(starts_with("con"), .fns=\(x) !is.na(x), .names="not_{.col}_isna")) |>
+  rowwise() |>
+  filter(all(c_across(ends_with("isna")))) |> 
+  ungroup() |> 
+  select(-ends_with("isna"), -firstid, -wave, -econsci) 
+
+confidence_data |> 
+  slice_sample(n=10) |> 
   gt::gt()
 ```
+
+
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+
+
+
 :::
 
 :::
@@ -251,7 +384,6 @@ mortality_tidy |>
 
 ::: {.callout-note title='Question'} 
  
-Build a bar plot to display the importance of Causes of deaths in France in years 1979 and 2006
 
 :::
 
@@ -260,62 +392,12 @@ Build a bar plot to display the importance of Causes of deaths in France in year
 ::: {.callout-tip title='Solution'} 
  
  
-```{r}
-th <- theme_get()
-(
-mortality_long |> 
-  mutate(Cause=fct_reorder(Cause, desc(grand_total))) |>
-  mutate(year=as_factor(year)) |>
-  ggplot() +
-  scale_fill_discrete() +
-  aes(x=Cause, 
-      y=total_year, 
-      fill=year) +
-  geom_col(position=position_dodge()) +
-  theme(
-    legend.position="none",
-    axis.text.x=element_blank(), #remove x axis labels
-    axis.ticks.x=element_blank(), #remove x axis ticks
-  ) +
-  labs(
-    title = "Causes of death, France, 1979, 2006",
-    subtitle= "Raw counts"
-  ) +
-  xlab(label=NULL)
-) |>
-  plotly::ggplotly()  
 
-oth <- theme_set(th)
-```
 
 :::
 :::
 
 
-::: {.callout-note title='Question'} 
- 
-Compute and display the total number of deaths in France in years 1979 and 2006.
-
-:::
-
-
-::: {.content-visible when-profile='solution'} 
- 
-::: {.callout-tip title='Solution'} 
- 
-```{r}
-mortality_long |> 
-  group_by(year) |> 
-  summarise(total_deaths = sum(total_year)) |>
-  gt::gt() |>
-  gt::cols_label(
-    year= "Year", 
-    total_deaths = "#Deaths") |>
-  gt::tab_caption("Mortality in France")
-```
-
-::: 
-:::
 
 
 
@@ -324,7 +406,7 @@ mortality_long |>
 
 ::: {.callout-note title="Question"}
 
-Compute the marginal counts for each year (1979, 2006). Compare. 
+Color individuals according to `sex`
 
 :::
 
@@ -332,19 +414,10 @@ Compute the marginal counts for each year (1979, 2006). Compare.
 
 ::: {.callout-tip title='Solution'} 
  
-Counts have already been computed above. 
+
 
 ```{r}
-mortality_long |> 
-  select(Cause, year, total_year, grand_total) |> 
-  pivot_wider(
-    id_cols=c(Cause, grand_total), 
-    names_from = year, 
-    values_from = total_year) |> 
-  rename(Total=grand_total) |> 
-  arrange(desc(Total)) |>
-  gt::gt() |>
-  my_gt()
+
 ```
  
 :::
@@ -449,7 +522,7 @@ with respect to $D_r$ and $D_c$
 
 ### Question
 
-Perform CA on the two contingency tables. 
+Perform MCA on the indicator matrix. 
 
 :::
 
@@ -469,8 +542,11 @@ a named list containing all relevant information.
 ::: {.callout-tip title='Solution'} 
  
  
-```{r}
 
+```{r}
+res.mca <- confidence_data |> 
+  select(starts_with("con")) |> 
+  FactoMineR::MCA(graph=F)
 ```
 
 
@@ -500,7 +576,7 @@ The result of `FactoMineR::MCA(...)` is a named and nested list with five elemen
 : a list of 9, containing the call to `CA()`, an object of type `language`, telling (in principle) the user how `CA()` was called. However, this is a *quoted expression*. Here we need to guess the value of `y` in the calling environment understand what's going on. 
 
 ```{r}
-lst_ca[[1]]$call$call
+
 ```
 Element `call` also contains the table margin distributions `marge.col` and `marge.row`. The truncation rank `ncp` (number of components) can be assigned before computing the SVD (default value is 5). Element $X$ stores the contingency table that was effectively used for computing Correpondence Analysis. 
 
@@ -571,44 +647,54 @@ Draw screeplots. Why are they useful? Comment briefly.
 
 :::
 
-::::: {.content-visible when-profile="solution"}  
 
+
+::: {.content-visible when-profile='solution'} 
+ 
 ::: {.callout-tip title='Solution'} 
  
 ```{r}
-
+tidy_mca_scree <- function(res_mca){
+  res_mca$eig |> 
+    as_tibble(rownames="Dim") |>
+    rename(
+      `% Inertia` = `percentage of variance`,
+      `Cumulative % Inertia` = `cumulative percentage of variance`
+    ) |> 
+    mutate(
+      PC = as.integer(str_match(Dim, 'dim ([0-9]*)')[,2])
+    )
+}
 ```
-
-:::
-
-:::::
-
-
-::::: {.content-visible when-profile="solution"}  
-
-::: {.callout-tip title='Solution'} 
- 
-### Screeplot 
 
 ```{r}
-
+res.mca |> 
+  tidy_mca_scree() |>
+  ggplot() +
+  aes(x=PC, y=eigenvalue, label=glue("{round(`% Inertia`,2)} %")) +
+  geom_col() +
+  geom_text(angle=45, vjust=-1, hjust=-.1) 
 ```
 
+
+::: 
 :::
 
 
-:::::
 
-## Row profiles analysis
+
+
+
+## Individual profiles analysis
 
 
 ::: {.callout-note}
 
 ### Question 
 
-Perform row profiles analysis.
+Perform Individual profiles analysis.
 
-What are the classical plots? How can you build them from the output of `FactoMiner::CA`? 
+What are the classical plots? How can you build them from the output of `FactoMiner::MCA`? 
 
 Build the table of row contributions (the so-called $\cos^2$)
 
@@ -618,14 +704,26 @@ Build the table of row contributions (the so-called $\cos^2$)
 
 ::: {.callout-tip title='Solution'} 
 
-Attribute `row` of objects of class `MCA` (exported from `FactoMineR`) is the starting point of any 
+Attribute `ind` of objects of class `MCA` (exported from `FactoMineR`) is the starting point of any 
 row profiles analysis. 
 
 ```{r}
-
+augment_mca <- function(res_mca, data=NULL){
+  
+  result <- res_mca$ind$coord |> 
+    as_tibble()  
+  
+  if (!is.null(data)) {
+    result <- result |>
+      bind_cols(confidence_data)
+      # inner_join(confidence_data, by=c("id")) 
+  }
+  
+  return(result)
+}
 ```
 
-Attribute `row` is a named list made of $4$ components. 
+Attribute `ind` is a named list made of $4$ components. 
 :::
 
 
@@ -639,13 +737,21 @@ Attribute `row` is a named list made of $4$ components.
 The columns of `coord` are pairwise orthogonal in the inner product space defined by `diag(call$marge.row)` (which embodies the marginal probabilities of the so-called Causes of deaths)
 
 ```{r}
-
+res.mca |> 
+  augment_mca(confidence_data) |> 
+  glimpse()
 ```
 
 We can recover `row$coord` from the left singular vectors and the singular values:
 
 ```{r}
-
+res.mca |> 
+  augment_mca(confidence_data) |> 
+  ggplot() +
+  aes(x=`Dim 3`, y=`Dim 4`, fill=consci) +
+  geom_point(alpha=.2, size=.2) +
+  coord_fixed() +
+  scale_fill_viridis_d()
 ```
 
 
@@ -759,29 +865,63 @@ Perform  column profiles analysis
 
 :::
 
-::::: {.content-visible when-profile='solution'} 
- 
-```{r}
-
-```
-
-:::::
-
 
 ::::: {.content-visible when-profile="solution"}  
 
 ::: {.callout-tip title='Solution'} 
 
-
 ```{r}
-
+res.mca |> 
+  factoextra::fviz_mca_var() +
+  coord_fixed() +
+  facet_zoom(
+    xy=`Dim 1`>=0 & `Dim 2`>=0,
+    zoom_data= `Dim 1`>=0 & `Dim 2`>=0,
+    xlim=c(0,2),ylim=c(0,2))
 ```
 
 ```{r}
-
+tidy_mca_var <- function(res_mca){
+  res_mca$var$coord |> 
+  as_tibble(rownames="levels")
+}
 ```
 
- 
+```{r}
+(
+  tidy_mca_var(res.mca) |>  
+  ggplot() +
+    aes(x=`Dim 1`, y=`Dim 2`, label=levels) +
+    geom_point() +
+    coord_fixed()
+) |>
+   plotly::ggplotly()
+```
+
+
+```{r}
+(
+  tidy_mca_var(res.mca) |>  
+  ggplot() +
+    aes(x=`Dim 3`, y=`Dim 4`, label=levels) +
+    geom_point() +
+    coord_fixed()
+) |>
+   plotly::ggplotly()
+```
+
+
+
+ ```{r}
+(
+  tidy_mca_var(res.mca) |>  
+  ggplot() +
+    aes(x=`Dim 4`, y=`Dim 5`, label=levels) +
+    geom_point() +
+    coord_fixed()
+) |>
+   plotly::ggplotly()
+```
 :::
 
 
@@ -869,3 +1009,16 @@ It is convenient to use distinct color scales for  rows and columns.
 :::::
 
 
+
+
+Costa, Patrício & Santos, Nadine & Guimaraes, Pedro & Cotter, Jorge & Sousa, Nuno. (2013). The Use of Multiple Correspondence Analysis to Explore Associations between Categories of Qualitative Variables in Healthy Ageing. *Journal of aging research.* 2013. 302163. 10.1155/2013/302163. 
+
+https://link.springer.com/article/10.1007/s11135-016-0458-3
+
+https://doi.org/10.1007/s11135-016-0458-3
+
+Barth, Alice and Schmitz, Andreas. 2018. *Response quality and ideological dispositions: an integrative approach using geometric and classifying techniques*. Quality & Quantity
+
+> When analyzing survey data, response quality has consequential implications for substantial conclusions. Differences in response quality are usually explained by personality, or socio-demographic or cognitive characteristics. Little, however, is known about how respondents’ political attitudes, values, and opinions impact on quality aspects. This is a striking analytical omission, as potential associations between political values and various forms of response biases and artefacts call into question surveys’ ability to represent ‘public opinion’. In this contribution, response quality is traced back to respondents’ political and ideological dispositions. For this purpose, a relational understanding of response quality is applied that takes into account different aspects of response behaviors, as well as the interrelations between these indicators. Using data from the US General Social Survey (2010–2014), an empirical typology of response quality is created via finite mixture analysis. The resulting classes are then related to positions in the US field of ideological dispositions constructed via multiple correspondence analysis. The analyses reveal that there are (1) different combinations of response patterns and thus different empirical response types, and (2) that these types of response quality systematically vary with regard to the respondents’ political and ideological (dis)positions. Implications of the findings for public opinion surveys are discussed.
+
+https://doi.org/10.1007/s11135-016-0458-3
