@@ -1,6 +1,6 @@
 ---
 date: "`r Sys.time()`"
-title: "LAB: Multiple Correspondance Analysis"
+title: "LAB: Multiple Correspondance Analysis (MCA)"
 
 
 execute:
@@ -91,9 +91,6 @@ stopifnot(
 
 
 
-Multiple Correspondence Analysis  
-=========================
-
 
 ## The `GSS`  dataset
 
@@ -173,7 +170,7 @@ gss_panel10_long |>
 ```
 
 
-### Topics
+## The confidence topic
 
 A number of questions are related to the *confidence* topic
 
@@ -200,6 +197,7 @@ From the `gss_panel10_long` dataset, extract columns corresponding to questions 
 ::: {.callout-tip title='Solution'} 
  
 ```{r}
+#| label: confidence_ids
 confidence_ids <- gss_panel_doc |> 
   filter(str_detect(text, "confidence")) |>
   slice_sample(n=1, by=text) |> 
@@ -214,15 +212,17 @@ gss_panel10_long |>
 
 
 ```{r}
+#| label: confidence_ids_wave_1
 gss_panel_doc |>
   filter(id %in% confidence_ids) |> 
   select(-ends_with("2"), -ends_with("3")) |>
   gt::gt()
 ```
 
+
 Levels labels for answers to confidence questions are:
 
-Missing-data codes are `0,8,9`
+<!-- Missing-data codes are `0,8,9` -->
 
 ```{r}
 foo <- gss_panel_doc |>
@@ -232,12 +232,10 @@ foo <- gss_panel_doc |>
     cols=c(properties_1), names_repair = "universal") |> 
    unnest(
     cols=c(marginals_1), names_repair = "universal") |> 
-  
-   head(6) |> 
-  gt::gt()
-   pull(marginals_1)
+   head(6) 
 
-foo[[1]] |> gt::gt()
+
+foo |> gt::gt()
 ```
 
 - `IAP` stands for 
@@ -269,29 +267,28 @@ From [https://doi.org/10.1007/s11135-016-0458-3](https://doi.org/10.1007/s11135-
 
 
 
-## US field of ideological dispositions
-
 
 ```{r}
 panel_doc <- gssrdoc::gss_panel_doc
 ```
 
 
-## Elementary statistics and table wrangling
+## Table wrangling
 
 
 Before proceeding to Multiple Correspondence  Analysis (CA), let us select the set of active variables.
 
 ::: {.callout-note  title="Question"}
 
-- Project `gss_panel10_long` on `firstid, wave, id, sex,`  and columns with names in 
+Project `gss_panel10_long` on `firstid, wave, id, sex,`  and columns with names in 
 
 ```
   confinan conbus conclerg coneduc confed conlabor conpress conmedic contv conjudge consci conlegis conarmy
 ```
 
-
 :::
+
+
 
 ::: {.content-visible when-profile='solution'} 
  
@@ -331,6 +328,19 @@ levels_table <- confidence_10 |>
 > If respondents were not given the opportunity to provide a response to a question 
 > because it was not included in the survey they were administered, then their responses are coded as “IAP.”
 
+:::
+
+:::
+
+
+## Elementary statistics
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+::: {.callout-tip title='Solution'} 
+
 
 ```{r}
 confidence_panel10 |>
@@ -347,12 +357,23 @@ confidence_panel10 |>
 
 
 ```{r}
+#| eval: false
+#| 
 confidence_panel10 |>
   filter(is.na(conarmy)) |>
   filter(is.na(conclerg)) |>
   filter(is.na(conpress))
 ```
 
+:::
+:::
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+::: {.callout-tip title='Solution'} 
 
 ```{r}
 confidence_data <- confidence_panel10 |> 
@@ -360,30 +381,25 @@ confidence_data <- confidence_panel10 |>
   rowwise() |>
   filter(all(c_across(ends_with("isna")))) |> 
   ungroup() |> 
-  select(-ends_with("isna"), -firstid, -wave, -econsci) 
+  select(-ends_with("isna"), -firstid, -wave, -econsci) |>
+  mutate(across(starts_with("con"), fct_drop), sex=as_factor(sex))
 
 confidence_data |> 
   slice_sample(n=10) |> 
   gt::gt()
 ```
 
-
-
-:::
-
-
-::: {.callout-tip title='Solution'} 
- 
-
-
-
 :::
 
 :::
+
+
+
 
 
 ::: {.callout-note title='Question'} 
  
+TODO
 
 :::
 
@@ -392,37 +408,16 @@ confidence_data |>
 ::: {.callout-tip title='Solution'} 
  
  
-
-
-:::
-:::
-
-
-
-
-
-
-
-
-::: {.callout-note title="Question"}
-
-Color individuals according to `sex`
+TODO 
 
 :::
-
-::::: {.content-visible when-profile="solution"}  
-
-::: {.callout-tip title='Solution'} 
- 
-
-
-```{r}
-
-```
- 
 :::
 
-:::::
+
+
+
+
+
 
 
 
@@ -503,24 +498,26 @@ $$D_r^{1/2}\times \left(D_r^{-1} \times P \times D_c^{-1}- \mathbf{I}\times \mat
 :::
 
 
-::: {.callout-important}
-
-
-### MCA and extended SVD
+::: {.callout-important title="MCA and extended SVD"}
 
 As
+
 $$D_r^{-1} \times P \times D_c^{-1} - \mathbf{I}\mathbf{I}^\top = (D_r^{-1/2} \times U)\times D \times (D_c^{-1/2}\times V)^\top$$
 
-$(D_r^{-1/2} \times U)\times D \times (D_c^{-1/2}\times V)^\top$ is the _extended SVD_ of
+$$(D_r^{-1/2} \times U)\times D \times (D_c^{-1/2}\times V)^\top$$ 
+
+is the _extended SVD_ of
+
 $$D_r^{-1} \times P \times D_c^{-1} - \mathbf{I}\mathbf{I}^\top$$
+
 with respect to $D_r$ and $D_c$
 
 
 :::
 
-::: {.callout-note}
 
-### Question
+::: {.callout-note title="Question"}
+
 
 Perform MCA on the indicator matrix. 
 
@@ -531,11 +528,9 @@ Perform MCA on the indicator matrix.
 You may use `FactoMineR::MCA()`. It is interesting to compute the correspondence analysis in your own way, by preparing the matrix that is handled to `svd()` and returning 
 a named list containing all relevant information. 
 
-> Do the Jedi and Sith build their own light sabers? Jedi do. It's a key part of the religion to have a kyber crystal close to you, to build the saber through the power of the force creating a blade unique and in tune with them
-
-{{< fa jedi >}}
-
 :::
+
+
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -544,24 +539,24 @@ a named list containing all relevant information.
  
 
 ```{r}
+#| label: MCA
 res.mca <- confidence_data |> 
   select(starts_with("con")) |> 
   FactoMineR::MCA(graph=F)
 ```
 
-
-
 :::
 
 :::::
 
-::: {.callout-note}
 
-### Question
+::: {.callout-note title="Question"}
 
 If you did use `FactoMineR::MCA()`, explain the organization of the result.
 
 :::
+
+
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -575,9 +570,7 @@ The result of `FactoMineR::MCA(...)` is a named and nested list with five elemen
 `call`
 : a list of 9, containing the call to `CA()`, an object of type `language`, telling (in principle) the user how `CA()` was called. However, this is a *quoted expression*. Here we need to guess the value of `y` in the calling environment understand what's going on. 
 
-```{r}
 
-```
 Element `call` also contains the table margin distributions `marge.col` and `marge.row`. The truncation rank `ncp` (number of components) can be assigned before computing the SVD (default value is 5). Element $X$ stores the contingency table that was effectively used for computing Correpondence Analysis. 
 
 `row`
@@ -589,33 +582,34 @@ Element `call` also contains the table margin distributions `marge.col` and `mar
 `svd`
 : a list of 3, just as the resuld of `svd()` containing the singular values, the left and right singular vectors of matrix $...$
 
+:::
 
-
-### Output of  `print(res.mca)`
-   
+::: {.callout-tip title='Solution, output of  `print(res.mca)`'} 
 
    
 |   | Name   |             Description                                          |
 |:-:|:------------------------|:----------------------------------------------------|
-|1  |   "$eig"                |"eigenvalues"                                        |
-|2  |   "$var"                |"results for the variables"                          |
-|3  |   "$var$coord"          |"coord. of the categories"                           |
-|4  |   "$var$cos2"           |"cos2 for the categories"                           |
-|5  |   "$var$contrib"        |"contributions of the categories"                    |
-|6  |   "$var$v.test"         |"v-test for the categories"                          |
-|7  |   "$ind"                |"results for the individuals"                        |
-|8  |   "$ind$coord"          |"coord. for the individuals"                         |
-|9  |   "$ind$cos2"          |"cos2 for the individuals"                          |
-|10 |   "$ind$contrib"        |"contributions of the individuals"                   |
-|11 |  "$quali.sup"          |"results for the supplementary categorical variables"|
-|12 |  "$quali.sup$coord"    |"coord. for the supplementary categories"            |
-|13 |  "$quali.sup$cos2"     |"cos2 for the supplementary categories"              |
-|14 |  "$quali.sup$v.test"   |"v-test for the supplementary categories"            |
-|15 |  "$call"               |"intermediate results"                               |
-|16 |  "$call$marge.col"     |"weights of columns"                                 |
-|17 |  "$call$marge.li"      |"weights of rows"                                    |
+|1  |   `$eig`                |"eigenvalues"                                        |
+|2  |   `$var`                |"results for the variables (categories)"                          |
+|3  |   `$var$coord`          |"coord. of the categories"                           |
+|4  |   `$var$cos2`           |"cos2 for the categories"                           |
+|5  |   `$var$contrib`        |"contributions of the categories"                    |
+|6  |   `$var$v.test`         |"v-test for the categories"                          |
+|7  |   `$ind`                |"results for the individuals"                        |
+|8  |   `$ind$coord`          |"coord. for the individuals"                         |
+|9  |   `$ind$cos2`          |"cos2 for the individuals"                          |
+|10 |   `$ind$contrib`        |"contributions of the individuals"                   |
+|11 |  `$quali.sup`          |"results for the supplementary categorical variables"|
+|12 |  `$quali.sup$coord`    |"coord. for the supplementary categories"            |
+|13 |  `$quali.sup$cos2`     |"cos2 for the supplementary categories"              |
+|14 |  `$quali.sup$v.test`   |"v-test for the supplementary categories"            |
+|15 |  `$call`               |"intermediate results"                               |
+|16 |  `$call$marge.col`     |"weights of columns"                                 |
+|17 |  `$call$marge.li`      |"weights of rows"                                    |
 
-{{< fa exclamation-triangle >}}  `res.mca$svd` is not part of the output 
+
+
+{{< fa exclamation-triangle >}}  `res.mca$svd` is not part of the output! 
 
 - `eig` is computed from the singular values in `res.mca$svd`
 
@@ -623,13 +617,12 @@ Element `call` also contains the table margin distributions `marge.col` and `mar
 
 - `ind` conatins material for plotting information about individuals on on factorial planes
 
-???
 
 :::
 
 ::: {.callout-warning}
 
-In principle, all relevant information can be gathered from components `svd`, `call.marge.row`, and `call.marge.col`. 
+In principle, all relevant information can be gathered from components `svd`, `call.marge.li`, and `call.marge.col`. 
 
 :::
 
@@ -639,9 +632,7 @@ In principle, all relevant information can be gathered from components `svd`, `c
 ## Screeplots
 
 
-::: {.callout-note}
-
-### Question
+::: {.callout-note title="Question"}
 
 Draw screeplots. Why are they useful? Comment briefly. 
 
@@ -649,11 +640,13 @@ Draw screeplots. Why are they useful? Comment briefly.
 
 
 
-::: {.content-visible when-profile='solution'} 
+::::: {.content-visible when-profile='solution'} 
  
 ::: {.callout-tip title='Solution'} 
  
 ```{r}
+#| label: tidy-scree
+#| 
 tidy_mca_scree <- function(res_mca){
   res_mca$eig |> 
     as_tibble(rownames="Dim") |>
@@ -667,7 +660,10 @@ tidy_mca_scree <- function(res_mca){
 }
 ```
 
+
+
 ```{r}
+#| label: tidy-scree-plot
 res.mca |> 
   tidy_mca_scree() |>
   ggplot() +
@@ -678,19 +674,17 @@ res.mca |>
 
 
 ::: 
-:::
+
+:::::
 
 
 
 
 
+## Individuals
 
-## Individual profiles analysis
 
-
-::: {.callout-note}
-
-### Question 
+::: {.callout-note title="Question"}
 
 Perform Individual profiles analysis.
 
@@ -708,6 +702,7 @@ Attribute `ind` of objects of class `MCA` (exported from `FactoMineR`) is the st
 row profiles analysis. 
 
 ```{r}
+#| label: augment_mca
 augment_mca <- function(res_mca, data=NULL){
   
   result <- res_mca$ind$coord |> 
@@ -724,13 +719,14 @@ augment_mca <- function(res_mca, data=NULL){
 ```
 
 Attribute `ind` is a named list made of $4$ components. 
+
 :::
 
 
 ::: {.callout-tip title='Solution'} 
   
 `coord`
-: a matrix with named rows and columns. The number of rows of `coord` matches the number of rows of the contingency table (here, the number of possible death Causes). The number of columns matches the rank of the truncated SVD that underlies Correspondance Analysis. Here it is $5$ which also the rank of the standardized contingency table.
+: a matrix with *named* rows and columns. The number of rows of `coord` matches the number of rows of the contingency table (here, the number of possible death Causes). The number of columns matches the rank of the truncated SVD that underlies Correspondance Analysis. Here it is $5$ which also the rank of the standardized contingency table.
 
 > The row principal coordinates are the principal coordinates of each row profile in terms of the principal component. 
 
@@ -738,6 +734,7 @@ The columns of `coord` are pairwise orthogonal in the inner product space define
 
 ```{r}
 res.mca |> 
+#| label: augment_mca_glimpse
   augment_mca(confidence_data) |> 
   glimpse()
 ```
@@ -745,6 +742,7 @@ res.mca |>
 We can recover `row$coord` from the left singular vectors and the singular values:
 
 ```{r}
+#| label: augment_mca_plot
 res.mca |> 
   augment_mca(confidence_data) |> 
   ggplot() +
@@ -753,12 +751,6 @@ res.mca |>
   coord_fixed() +
   scale_fill_viridis_d()
 ```
-
-
-```{r}
-
-```
-
 
 :::
 
@@ -776,7 +768,7 @@ Row inertia can be obtained by multiplying the row marginal probability by the s
 the row in the principal coordinate matrix. 
  
 ```{r}
-
+#| label: augment_mca_inertia_TODO
 ```
 
 :::
@@ -788,7 +780,7 @@ the row in the principal coordinate matrix.
 
 
 ```{r}
-
+#| label: augment_mca_cos2_TODO
 ```
 
 :::
@@ -802,56 +794,51 @@ Not too surprisingly, `coord`, `contrib`, and `cos2` share the same row names an
 
 
 ```{r}
-
+#| label: augment_mca_contrib_TODO
 ```
 
-The Row Profiles are the rows of matrix `R` below
-
-```{r}
-
-```
-
-```{r}
-
-```
 
 :::
 
 
-::: {.callout-tip title='Solution'} 
- 
-We can now display a scatterplot from component `coord`. This is called a *Row Plot*. 
 
-```{r}
+:::::
 
-```
- 
+
+## Adding passive variables to individual plots
+
+::: {.callout-note title="Question"}
+
+Color individuals according to `sex`
+
 :::
 
+::::: {.content-visible when-profile="solution"}  
 
 ::: {.callout-tip title='Solution'} 
+ 
 
 
 ```{r}
-
+# TODO
 ```
-
+ 
 :::
 
 :::::
 
 
+
 ::: {.callout-note title='Question'} 
  
-
+TODO
 
 :::
 
 ::::: {.content-visible when-profile="solution"}  
 
 ```{r}
-
-
+#| label: TODOTODO
 ```
 
 
@@ -859,9 +846,15 @@ We can now display a scatterplot from component `coord`. This is called a *Row P
 
 
 
+
+
+
+## Variables/Categories
+
+
 ::: {.callout-note title='Question'} 
  
-Perform  column profiles analysis
+Perform  column profiles (categories) analysis. You may use `factoextra::fviz_mca_var()`
 
 :::
 
@@ -871,62 +864,73 @@ Perform  column profiles analysis
 ::: {.callout-tip title='Solution'} 
 
 ```{r}
+#| label: zooming_var_mca
 res.mca |> 
   factoextra::fviz_mca_var() +
   coord_fixed() +
   facet_zoom(
     xy=`Dim 1`>=0 & `Dim 2`>=0,
-    zoom_data= `Dim 1`>=0 & `Dim 2`>=0,
+#    zoom_data= `Dim 1`>=0 & `Dim 2`>=0,
     xlim=c(0,2),ylim=c(0,2))
 ```
 
 ```{r}
+#| label: tidy_mca_var
 tidy_mca_var <- function(res_mca){
   res_mca$var$coord |> 
   as_tibble(rownames="levels")
 }
 ```
 
-```{r}
-(
-  tidy_mca_var(res.mca) |>  
-  ggplot() +
-    aes(x=`Dim 1`, y=`Dim 2`, label=levels) +
-    geom_point() +
-    coord_fixed()
-) |>
-   plotly::ggplotly()
-```
-
 
 ```{r}
-(
-  tidy_mca_var(res.mca) |>  
+#| label: tidy_mca_var_plotly_1_2
+tidied_mca_var <- tidy_mca_var(res.mca) |>   
+  mutate(sentiment=str_split(as.character(levels),'_')) |>
+  mutate(topic=map_chr(sentiment, \(x)x[1]), sentiment=map_chr(sentiment, \(x)x[2])) 
+
+p <- tidied_mca_var |> 
   ggplot() +
-    aes(x=`Dim 3`, y=`Dim 4`, label=levels) +
-    geom_point() +
-    coord_fixed()
-) |>
-   plotly::ggplotly()
+    aes(x=`Dim 1`, y=`Dim 2`, label=levels, fill=topic, shape=sentiment) +
+    geom_point(alpha=.5, show.legend = F) +
+    coord_fixed() +
+    scale_color_viridis_d() +
+    theme(legend.position="none") +
+    labs(
+      title = "MCA: Variables categories",
+      subtitle = "Color: topic, Shape: confidence level",
+      caption = "GSS data, panel 2010, wave 1"
+    )
+
+p |>
+  plotly::ggplotly() 
+```
+
+```{r}
+#| label: tidy_mca_var_plotly_3_4
+(
+ p + 
+    aes(x=`Dim 3`, y=`Dim 4`, label=levels, color=sentiment) 
+) |>   plotly::ggplotly() 
 ```
 
 
 
- ```{r}
+```{r}
+#| label: tidy_mca_var_plotly_4_5
 (
-  tidy_mca_var(res.mca) |>  
-  ggplot() +
-    aes(x=`Dim 4`, y=`Dim 5`, label=levels) +
-    geom_point() +
-    coord_fixed()
-) |>
-   plotly::ggplotly()
+  p +
+    aes(x=`Dim 4`, y=`Dim 5`, label=levels) 
+) |>  plotly::ggplotly() 
 ```
+
+
 :::
 
-
-
 :::::
+
+
+
 
 
 ## Symmetric plots 
@@ -949,7 +953,16 @@ Build the symmetric plots (biplots)  for multiple correspondence analysis.
 
 ```{r}
 #| eval: false
+#| label: biplot
 
+p <- res.mca |> 
+  factoextra::fviz_mca_biplot(
+    label= "var",
+    alpha.ind=.5
+#    repel =T
+  )
+
+p |>  plotly::ggplotly()
 ```
 
 :::
@@ -960,14 +973,16 @@ Build the symmetric plots (biplots)  for multiple correspondence analysis.
 ### {{< fa jedi >}}
 
 ```{r}
-
+#| label: TODO-biplot-jedi
 ```
 
 :::
 
 :::::
 
-::: {.content-visible when-profile='solution'} 
+
+
+::::: {.content-visible when-profile='solution'} 
 
 ::: {.callout-tip title='Solution'} 
  
@@ -980,13 +995,14 @@ It is convenient to use distinct color scales for  rows and columns.
 
 :::
 
-:::
+:::::
+
 
 ## Mosaicplots
 
 ::: {.callout-note title="Question"}
 
-
+TODO
 
 :::
 
@@ -999,16 +1015,54 @@ It is convenient to use distinct color scales for  rows and columns.
 ::: {.callout-tip title='Solution'} 
  
 ```{r}
+confidence_data |> 
+  select(consci, conmedic) |>
+  table() |> 
+  mosaicplot(color=T)
+```
 
+```{r}
+confidence_data |> 
+  select(consci, conmedic) |> 
+  table() |>
+  chisq.test() |> 
+  broom::glance() |> 
+  gt::gt() |> 
+  gt::tab_caption("Chi2 independence test for Confidence in Science and Confidence in Medicine")
 ```
 
 
+```{r}
+confidence_data |> 
+  select(consci, conclerg) |> 
+  table() |>
+  chisq.test() |> 
+  broom::glance() |> 
+  gt::gt() |> 
+  gt::tab_caption("Chi2 independence test for Confidence in Science and Confidence in Clergy")
+```
+
+
+```{r}
+t_sex_clerg_sci <- confidence_data |> 
+  select(sex, conclerg, consci) |> 
+  table()
+  
+t_sex_clerg_sci  |>
+  vcd::doubledecker( )
+```
+
+```{r}
+t_sex_clerg_sci |> 
+  mosaicplot(color=T, main="Confidence in Clergy and Science")
+```
 
 :::
 
 :::::
 
 
+## References 
 
 
 Costa, Patrício & Santos, Nadine & Guimaraes, Pedro & Cotter, Jorge & Sousa, Nuno. (2013). The Use of Multiple Correspondence Analysis to Explore Associations between Categories of Qualitative Variables in Healthy Ageing. *Journal of aging research.* 2013. 302163. 10.1155/2013/302163. 
