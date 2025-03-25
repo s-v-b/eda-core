@@ -94,6 +94,7 @@ stopifnot(
 
 ## The `GSS`  dataset
 
+We will use data coming from the General Social Survey. The General Social Survey data can be retrieved using the `gssr` package. If needed, install the `gssr` package and its companion package `gssrdoc`. 
 
 ```{r}
 stopifnot(
@@ -102,14 +103,20 @@ stopifnot(
 )
 ```
 
+The data we will use are panel data made available by the GSS. In order to explore them, it's very useful  toload `gss_dict` and `gss_panel_doc`. 
+
 ```{r}
 data(gss_dict)
 data(gss_panel_doc)
 ```
 
+Check the online help. 
+
 ```{r}
 ?gss_panel_doc
 ```
+
+ `gss_dict` and `gss_panel_doc` are dataframes that can be queried:
 
 ```{r}
 gss_panel_doc |> 
@@ -118,16 +125,21 @@ gss_panel_doc |>
   gt::gt()
 ```
 
-In the panel questionnaire, some questions have `race` in the field `id`. 
+In the panel *questionnaire*, some questions have `race` in the field `id`.  Check again the online help. 
 
 ```{r}
 #| eval: false
 ?race
 ```
 
+The answer is something like that:
+
 ```
 Question 24. What race do you consider yourself?
 ```
+
+And it contains a brief summary of the answers given through the years.
+
 
 | Year | Black  | Other | White | iap (NA) | Total| 
 |-----:|-------:|------:|------:|-------:|-------:|
@@ -146,6 +158,7 @@ gss_panel_doc |>
   gt::gt()
 ```
 
+The data set we will use comes from year 2010 panel data.
 
 ```{r}
 data("gss_panel10_long")
@@ -153,6 +166,7 @@ data("gss_panel10_long")
 gss_panel10_long 
 ```
 
+At the beginning, the panel was made of roughly 2000 respondents. And the respondents were interviewed in 2010, 2012 and 2014 (the three waves). 
 
 ```{r}
 gss_panel10_long  |>  
@@ -160,6 +174,7 @@ gss_panel10_long  |>
   select(firstid, wave, id, sex)
 ```
 
+Some respondents left the survey. Attrition can be monitored within the next query. 
 
 ```{r}
 gss_panel10_long |> 
@@ -172,7 +187,9 @@ gss_panel10_long |>
 
 ## The confidence topic
 
-A number of questions are related to the *confidence* topic
+Do GSS surveys are made of a huge number of questions. Not all questions were asked to the respondents. Indeed, each question was asked to two thirds of the respondents. Questions were related to demographic features (Age, Sex, Level of education, Employment and so on). Answers to these questions can be used to determine whether the panel sample is representative. Data can be compared with last census data (there is a census every ten years in the US). 
+
+A number of questions are related to the *confidence* topic. Respondents were asked about the level of confidence they put  in a wide array of institutions. 
 
 ```{r}
 gss_panel_doc |> 
@@ -182,6 +199,8 @@ gss_panel_doc |>
   gt::gt()
 ```
 
+For institutions like *Science* or *Medicine*, or *Executive branch of federal government*, Respondents were asked whether they have: *Great deal of confidence*, *Only some confidence*, *Hardly any confidence* in the institution. 
+The same Likert scale with 3 levels was used for all institutions. 
 
 ::: {.callout-note}
 
@@ -196,13 +215,19 @@ From the `gss_panel10_long` dataset, extract columns corresponding to questions 
 
 ::: {.callout-tip title='Solution'} 
  
+We first gather the `id` of the questions pertaining to the confidence topic.  
+
 ```{r}
 #| label: confidence_ids
 confidence_ids <- gss_panel_doc |> 
   filter(str_detect(text, "confidence")) |>
   slice_sample(n=1, by=text) |> 
   pull(id)
+```
 
+Then we protect the panel data on the questions pertaining to the confidence topic. We also keep the respondent key, sex, and the relevant wave. 
+s
+```{r}
 gss_panel10_long |> 
   filter(wave==1) |>
   select(firstid, wave, id, sex, contains(confidence_ids)) |>
@@ -210,6 +235,7 @@ gss_panel10_long |>
   gt::gt()
 ```
 
+Let us go back to the documentation. 
 
 ```{r}
 #| label: confidence_ids_wave_1
@@ -218,7 +244,6 @@ gss_panel_doc |>
   select(-ends_with("2"), -ends_with("3")) |>
   gt::gt()
 ```
-
 
 Levels labels for answers to confidence questions are:
 
@@ -238,32 +263,17 @@ foo <- gss_panel_doc |>
 foo |> gt::gt()
 ```
 
-- `IAP` stands for 
+- `IAP` stands for respondent was not asked the question.
 - `DK` stands for *Don't Know*
+
+
+> If respondents were not given the opportunity to provide a response to a question 
+> because it was not included in the survey they were administered, then their responses are coded as “IAP.”
 
 :::
 
 :::::
 
-## The case for using MCA 
-
-> In order to construct a *field of ideological and political attitudes*, which will subsequently
-be used as a reference for locating the empirical typologies of response styles and survey
-compliance, we apply *multiple correspondence analysis* (MCA). MCA belongs to the
-family of techniques used in geometric data analysis (Le Roux and Rouanet 2004). It
-allows for the extraction of the most important dimensions in a set of categorical variables,
-and the graphical representation of variable categories and individuals relative to each
-other in a coordinate system. Distances between categories as well as individuals can be
-interpreted as a measure of (dis)similarity: If categories often co-appear in individual's
-responses, they are located close together in the space produced by MCA. Rare co-appearances, 
-accordingly, result in a larger distance between the respective categories.
-Furthermore, *illustrative variables* can passively be projected into the field, a technique that
-has been termed *visual regression analysis* (Lebart et al. 1984). Whereas the space is
-determined by the distances between the categories of *active variables*, *passive variables*
-do not alter the structure of the constructed field, but appear in their average and hence
-most likely position.
-
-From [https://doi.org/10.1007/s11135-016-0458-3](https://doi.org/10.1007/s11135-016-0458-3)
 
 
 
@@ -286,6 +296,10 @@ Project `gss_panel10_long` on `firstid, wave, id, sex,`  and columns with names 
   confinan conbus conclerg coneduc confed conlabor conpress conmedic contv conjudge consci conlegis conarmy
 ```
 
+Filter so as to keep only wave `1`. 
+
+Transform all relevant columns into factors. 
+
 :::
 
 
@@ -296,10 +310,13 @@ Project `gss_panel10_long` on `firstid, wave, id, sex,`  and columns with names 
 
 
 ```{r}
+#| label: confidence_panel10
+#| 
 confidence_panel10 <- gss_panel10_long |> 
   filter(wave==1) |>
   select(firstid, wave, id, sex, contains(confidence_ids)) |>
-  mutate(across(starts_with("con"), as_factor)) 
+  mutate(across(starts_with("con"), as_factor)) |>
+  mutate(sex=as_factor(sex))
 ```
 
 ```{r}
@@ -325,8 +342,6 @@ levels_table <- confidence_10 |>
 
 ```
 
-> If respondents were not given the opportunity to provide a response to a question 
-> because it was not included in the survey they were administered, then their responses are coded as “IAP.”
 
 :::
 
@@ -334,6 +349,13 @@ levels_table <- confidence_10 |>
 
 
 ## Elementary statistics
+
+
+::: {.callout-note  title="Question"}
+
+Use `skimmr` to summarize your dataset. 
+
+:::
 
 
 ::::: {.content-visible when-profile="solution"}  
@@ -369,6 +391,18 @@ confidence_panel10 |>
 :::
 
 
+::: {.callout-note  title="Question"}
+
+There are a lot of missing data in your data set.
+
+How are missing cells related? 
+
+Drop rows with missing data in the confidence questions. 
+
+What are the dimensions of your data set? 
+
+:::
+
 
 ::::: {.content-visible when-profile="solution"}  
 
@@ -399,7 +433,9 @@ confidence_data |>
 
 ::: {.callout-note title='Question'} 
  
-TODO
+In your explore possible associations between the answers to the different *confidence* questions?
+
+How would you test possible independence between answer to *confidence in science* and *confidence in the Army*. 
 
 :::
 
@@ -415,9 +451,28 @@ TODO
 
 
 
+## The case for using MCA 
+
+> In order to construct a *field of ideological and political attitudes*, which will subsequently
+be used as a reference for locating the empirical typologies of response styles and survey
+compliance, we apply *multiple correspondence analysis* (MCA). MCA belongs to the
+family of techniques used in geometric data analysis (Le Roux and Rouanet 2004). It
+allows for the extraction of the most important dimensions in a set of categorical variables,
+and the graphical representation of variable categories and individuals relative to each
+other in a coordinate system. Distances between categories as well as individuals can be
+interpreted as a measure of (dis)similarity: If categories often co-appear in individual's
+responses, they are located close together in the space produced by MCA. Rare co-appearances, 
+accordingly, result in a larger distance between the respective categories.
+Furthermore, *illustrative variables* can passively be projected into the field, a technique that
+has been termed *visual regression analysis* (Lebart et al. 1984). Whereas the space is
+determined by the distances between the categories of *active variables*, *passive variables*
+do not alter the structure of the constructed field, but appear in their average and hence
+most likely position.
+
+From [https://doi.org/10.1007/s11135-016-0458-3](https://doi.org/10.1007/s11135-016-0458-3)
 
 
-
+In this lab, we won't look at the field of ideological and political attitudes, but rather at the field of confidence level in a variety of institutions. 
 
 
 
@@ -536,7 +591,7 @@ a named list containing all relevant information.
 
 ::: {.callout-tip title='Solution'} 
  
- 
+ We lazyly rely on `FactoMineR::MCA`. 
 
 ```{r}
 #| label: MCA
@@ -545,8 +600,10 @@ res.mca <- confidence_data |>
   FactoMineR::MCA(graph=F)
 ```
 
-:::
+The result is an object of `S3` class `MCA`. 
 
+:::
+s
 :::::
 
 
@@ -573,11 +630,11 @@ The result of `FactoMineR::MCA(...)` is a named and nested list with five elemen
 
 Element `call` also contains the table margin distributions `marge.col` and `marge.row`. The truncation rank `ncp` (number of components) can be assigned before computing the SVD (default value is 5). Element $X$ stores the contingency table that was effectively used for computing Correpondence Analysis. 
 
-`row`
-: Information gathered from SVD to facilitate row profiles analysis. 
+`ind`
+: Information gathered from SVD to facilitate individulals (respndents)  analysis. 
 
-`col`
-: a list structured in the same way as element `row`. Used for column profiles analysis
+`ind`
+: a list structured in the same way as element `ind`. Used for variables/categories profiles analysis
 
 `svd`
 : a list of 3, just as the resuld of `svd()` containing the singular values, the left and right singular vectors of matrix $...$
@@ -644,6 +701,10 @@ Draw screeplots. Why are they useful? Comment briefly.
  
 ::: {.callout-tip title='Solution'} 
  
+We first define a tidying function for preparing the screeplot. 
+It is designed along the lines of method `tidy` for objects of class `prcomp`.
+It consists in building a data frame from component `eig` of the `MCA` object.  
+
 ```{r}
 #| label: tidy-scree
 #| 
@@ -660,7 +721,7 @@ tidy_mca_scree <- function(res_mca){
 }
 ```
 
-
+We can now build a column plot. 
 
 ```{r}
 #| label: tidy-scree-plot
@@ -672,6 +733,7 @@ res.mca |>
   geom_text(angle=45, vjust=-1, hjust=-.1) 
 ```
 
+Note that the share of cumulated inertia doesn't grow very fast with the number of components. Situation is different from what we met when performing Correspondence Analysis or Principal Component Analysis. This tells us that we will hqve to look beyond the first two axis. This is commonplace with multiple correspondence analysis. Look at the reference below where most of the interesting information can be found on the 3rd and 4th axis. 
 
 ::: 
 
@@ -701,6 +763,8 @@ Build the table of row contributions (the so-called $\cos^2$)
 Attribute `ind` of objects of class `MCA` (exported from `FactoMineR`) is the starting point of any 
 row profiles analysis. 
 
+We design an augment method. For objects of class `MCA`. This is like what is done for objects of class `prcomp` and  different from what we did with objects of class `CA`. Indeed, `MCA` on the indicator matrix handles a sample just like `PCA` and not a contingency table like `CA`.  
+
 ```{r}
 #| label: augment_mca
 augment_mca <- function(res_mca, data=NULL){
@@ -718,19 +782,23 @@ augment_mca <- function(res_mca, data=NULL){
 }
 ```
 
-Attribute `ind` is a named list made of $4$ components. 
 
 :::
 
 
 ::: {.callout-tip title='Solution'} 
-  
+
+Attribute `ind` is a named list made of $4$ components. 
+
+
 `coord`
-: a matrix with *named* rows and columns. The number of rows of `coord` matches the number of rows of the contingency table (here, the number of possible death Causes). The number of columns matches the rank of the truncated SVD that underlies Correspondance Analysis. Here it is $5$ which also the rank of the standardized contingency table.
+: a matrix with *named* rows and columns. The number of rows of `coord` matches the number of rows of the table fed to `MCA` (here, the number of respondents in the panel). The number of columns matches the rank of the truncated SVD that underlies Multiple Correspondance Analysis. Here it is the default truncation $5$.
 
-> The row principal coordinates are the principal coordinates of each row profile in terms of the principal component. 
+> The principal coordinates are the principal coordinates of each individual in terms of the principal component. 
 
-The columns of `coord` are pairwise orthogonal in the inner product space defined by `diag(call$marge.row)` (which embodies the marginal probabilities of the so-called Causes of deaths)
+The columns of `coord` are pairwise orthogonal in the usual  inner product space.
+
+Function `augment_mca` Bind the columns of `coord` with the columns of the original dataset.  
 
 ```{r}
 res.mca |> 
@@ -739,14 +807,17 @@ res.mca |>
   glimpse()
 ```
 
-We can recover `row$coord` from the left singular vectors and the singular values:
+Note that, we can recover `ind$coord` from the left singular vectors and the singular values.
+
+The output of `augment_mca` is the basis of the individual plots.  Individual plots are defined by picking a pair of principal axes. 
+Him use the 3rd and the 4th axis, and we map the `sex` column from the original dataset  to the `fill` aesthetics.  
 
 ```{r}
 #| label: augment_mca_plot
 res.mca |> 
   augment_mca(confidence_data) |> 
   ggplot() +
-  aes(x=`Dim 3`, y=`Dim 4`, fill=consci) +
+  aes(x=`Dim 3`, y=`Dim 4`, fill=sex) +
   geom_point(alpha=.2, size=.2) +
   coord_fixed() +
   scale_fill_viridis_d()
@@ -755,23 +826,6 @@ res.mca |>
 :::
 
 
-::: {.callout-tip title='Solution'} 
-
-
-`inertia`
-: a numerical vector with length matching the number of rows of `coord`, `contrib` and `cos2`. 
-
-> Inertia is the way CA measures variation between row profiles. Total inertia is the $\chi^2$ statistic divided by sample size. 
-
-
-Row inertia can be obtained by multiplying the row marginal probability by the squared Euclidean norm of 
-the row in the principal coordinate matrix. 
- 
-```{r}
-#| label: augment_mca_inertia_TODO
-```
-
-:::
 
 ::: {.callout-tip title='Solution'} 
  
@@ -781,6 +835,14 @@ the row in the principal coordinate matrix.
 
 ```{r}
 #| label: augment_mca_cos2_TODO
+
+res.mca |> 
+  augment_mca(confidence_data) |> 
+  ggplot() +
+  aes(x=`Dim 1`, y=`Dim 2`, fill=sex) +
+  geom_point(alpha=.2, size=.2) +
+  coord_fixed() +
+  scale_fill_viridis_d()
 ```
 
 :::
@@ -805,44 +867,7 @@ Not too surprisingly, `coord`, `contrib`, and `cos2` share the same row names an
 :::::
 
 
-## Adding passive variables to individual plots
-
-::: {.callout-note title="Question"}
-
-Color individuals according to `sex`
-
-:::
-
-::::: {.content-visible when-profile="solution"}  
-
-::: {.callout-tip title='Solution'} 
  
-
-
-```{r}
-# TODO
-```
- 
-:::
-
-:::::
-
-
-
-::: {.callout-note title='Question'} 
- 
-TODO
-
-:::
-
-::::: {.content-visible when-profile="solution"}  
-
-```{r}
-#| label: TODOTODO
-```
-
-
-:::::   
 
 
 
@@ -863,16 +888,22 @@ Perform  column profiles (categories) analysis. You may use `factoextra::fviz_mc
 
 ::: {.callout-tip title='Solution'} 
 
+The `var` component. Of an MCA object is related with the right singular vectors of the residual matrix. 
+
+
 ```{r}
 #| label: zooming_var_mca
-res.mca |> 
+p <- res.mca |> 
   factoextra::fviz_mca_var() +
-  coord_fixed() +
+  coord_fixed() 
+  
+p +
   facet_zoom(
     xy=`Dim 1`>=0 & `Dim 2`>=0,
-#    zoom_data= `Dim 1`>=0 & `Dim 2`>=0,
     xlim=c(0,2),ylim=c(0,2))
 ```
+
+Following what has been done for objects of class `prcomp`, we design  a `tidy_mca_var` function that turns the `var` component into a dataframe. Row names which correspond to categories, are  turned into a column we call `levels`. 
 
 ```{r}
 #| label: tidy_mca_var
@@ -882,6 +913,9 @@ tidy_mca_var <- function(res_mca){
 }
 ```
 
+A value in column `levels` indicate a variable., that is a topic (science, religion, army, ...) and a confidence level (A value on a Likert scale). We enrich the data frame by extracting the variable (`topic`) and the value (`sentiment`). 
+
+We are then ready to plot an analog of the correlation circle. 
 
 ```{r}
 #| label: tidy_mca_var_plotly_1_2
@@ -905,6 +939,13 @@ p <- tidied_mca_var |>
 p |>
   plotly::ggplotly() 
 ```
+
+Resorting to `plotly` allows us  to mitigate the overplotting effect. 
+
+The plot on the first two axes seems  easy to interpret. As we move along the first axis from the left, we see growing confidence.  
+On the positive part of the second axis, we have extreme confidence levels, either high or low. This suggests that individuals have trends:  either we trust all institutions; or none of them; or finally a little bit all of them. 
+
+How could we comfort such a narrative?
 
 ```{r}
 #| label: tidy_mca_var_plotly_3_4
@@ -951,6 +992,8 @@ Build the symmetric plots (biplots)  for multiple correspondence analysis.
  
 ### From the shelf 
 
+We resort to `factoextra`. In principle, the biplot can be constructed  from the `coord` matrices  in the `var` and the `ind` components of the  `MCA` object.  
+
 ```{r}
 #| eval: false
 #| label: biplot
@@ -982,27 +1025,16 @@ p |>  plotly::ggplotly()
 
 
 
-::::: {.content-visible when-profile='solution'} 
-
-::: {.callout-tip title='Solution'} 
- 
-It is convenient to use distinct color scales for  rows and columns. 
-
- 
-```{r}
-
-```
-
-:::
-
-:::::
 
 
 ## Mosaicplots
 
+
+MCA can be complemented by  Mosaicplots, Double Decker plots,  Chi-square tests, and  Correspondence analyses between pair of variables. 
+
 ::: {.callout-note title="Question"}
 
-TODO
+Draw a mosaic plot to visualize association between confidence levesl in Science and confidence level in Medicine. 
 
 :::
 
@@ -1062,17 +1094,11 @@ t_sex_clerg_sci |>
 :::::
 
 
-## References 
+## Further references 
 
-
-Costa, Patrício & Santos, Nadine & Guimaraes, Pedro & Cotter, Jorge & Sousa, Nuno. (2013). The Use of Multiple Correspondence Analysis to Explore Associations between Categories of Qualitative Variables in Healthy Ageing. *Journal of aging research.* 2013. 302163. 10.1155/2013/302163. 
-
-https://link.springer.com/article/10.1007/s11135-016-0458-3
-
-https://doi.org/10.1007/s11135-016-0458-3
 
 Barth, Alice and Schmitz, Andreas. 2018. *Response quality and ideological dispositions: an integrative approach using geometric and classifying techniques*. Quality & Quantity
 
 > When analyzing survey data, response quality has consequential implications for substantial conclusions. Differences in response quality are usually explained by personality, or socio-demographic or cognitive characteristics. Little, however, is known about how respondents’ political attitudes, values, and opinions impact on quality aspects. This is a striking analytical omission, as potential associations between political values and various forms of response biases and artefacts call into question surveys’ ability to represent ‘public opinion’. In this contribution, response quality is traced back to respondents’ political and ideological dispositions. For this purpose, a relational understanding of response quality is applied that takes into account different aspects of response behaviors, as well as the interrelations between these indicators. Using data from the US General Social Survey (2010–2014), an empirical typology of response quality is created via finite mixture analysis. The resulting classes are then related to positions in the US field of ideological dispositions constructed via multiple correspondence analysis. The analyses reveal that there are (1) different combinations of response patterns and thus different empirical response types, and (2) that these types of response quality systematically vary with regard to the respondents’ political and ideological (dis)positions. Implications of the findings for public opinion surveys are discussed.
 
-https://doi.org/10.1007/s11135-016-0458-3
+
