@@ -1,6 +1,6 @@
 ---
 date: "`r Sys.time()`"
-title: "LAB: Multiple Correspondance Analysis (MCA)"
+title: "LAB: Multiple Correspondence Analysis (MCA)"
 
 
 execute:
@@ -524,9 +524,9 @@ where $f_{\langle j,k\rangle}$ stands for the relative frequency of level $k$ of
 
 $$D_r = \frac{1}{n}\text{Id}_n\qquad D_c =\text{diag}\left(\frac{f_{\langle j,k\rangle}}{p}\right)_{j \leq p, k\leq J_j}$$
 
-In MCA, we compute the SVD $U \times D \times V^T$ of the standardized residuals matrix:
+In MCA, we compute the SVD $U \times D \times V^\top$ of the *standardized residuals matrix*:
 
-$$S = D_r^{-1/2}\times \left(P - r\times c^T\right) \times D_c^{-1/2} = \sqrt{n}\left(P - r\times c^T\right) \times D_c^{-1/2}$$
+$$S = D_r^{-1/2}\times \left(P - r\times c^\top\right) \times D_c^{-1/2} = \sqrt{n}\left(P - r\times c^\top\right) \times D_c^{-1/2}$$
 
 Coefficient $i, \langle j, k\rangle$  of $S$ is
 $$\frac{\mathbb{I}_{i, \langle j, k\rangle}- f_{\langle j,k\rangle}}{\sqrt{n f_{\langle j,k\rangle}/p}}$$
@@ -633,7 +633,7 @@ Element `call` also contains the table margin distributions `marge.col` and `mar
 `ind`
 : Information gathered from SVD to facilitate individulals (respndents)  analysis. 
 
-`ind`
+`var`
 : a list structured in the same way as element `ind`. Used for variables/categories profiles analysis
 
 `svd`
@@ -970,8 +970,58 @@ How could we comfort such a narrative?
 
 :::::
 
+::: {.callout-note title='Question'} 
+
+What is the `v.test` component of the `var`  component of an `MCA` object?
+ 
+:::
 
 
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+
+Here is a chatbot answer:
+
+> In *Multiple Correspondence Analysis (MCA)*, the *v-test* (also known as the *test-value* or *t-test value*) is a statistical measure used to assess the *significance of the association* between a category and a dimension (factor). It helps determine which categories contribute the most to the definition of a given dimension.
+
+### **Definition and Calculation**
+
+The v-test is computed as:
+
+
+$$v = \frac{p - P}{\sqrt{P(1 - P)/n}}$$
+
+
+where:
+- $p$ = proportion of individuals in a given category for the specific dimension,
+- $P$ = overall proportion of individuals in that category across all dimensions,
+- $n$ = total number of individuals.
+
+Alternatively, the v-test can also be expressed as:
+
+$$v = \frac{\text{category coordinate}}{\text{standard deviation of the coordinate}}$$
+
+This essentially provides a **z-score**, which follows a standard normal distribution under the null hypothesis.
+
+### Interpretation
+
+- A *high absolute v-test value* (typically above 2 or below -2) indicates that the category is *strongly associated* with the given dimension.
+- *Positive v-test*: The category is overrepresented in that dimension.
+- *Negative v-test*: The category is underrepresented in that dimension.
+- If the absolute value of the v-test is below 2, the association is **not statistically significant** (at a 5% significance level).
+
+### *Why is it useful?*
+
+- It helps *interpret MCA results quantitatively* rather than relying only on visual inspection.
+- It aids in identifying *key categories* that structure the data on a given axis.
+- It provides statistical validation for category contributions to dimensions.
+
+Would you like a practical example or interpretation of a specific MCA result?
+
+:::
+
+:::
 
 
 ## Symmetric plots 
@@ -995,17 +1045,18 @@ Build the symmetric plots (biplots)  for multiple correspondence analysis.
 We resort to `factoextra`. In principle, the biplot can be constructed  from the `coord` matrices  in the `var` and the `ind` components of the  `MCA` object.  
 
 ```{r}
-#| eval: false
+#| eval: true
 #| label: biplot
 
 p <- res.mca |> 
   factoextra::fviz_mca_biplot(
     label= "var",
     alpha.ind=.5
-#    repel =T
   )
 
-p |>  plotly::ggplotly()
+p
+
+# p |>  plotly::ggplotly()
 ```
 
 :::
