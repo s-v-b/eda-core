@@ -1,0 +1,901 @@
+---
+title: "Lab: Clustering k-means"
+date: "`r Sys.time()`"
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+  message: false
+  warning: false
+
+format:
+  html:
+    output-file: lab-kmeans.html
+  pdf:
+    output-file: lab-kmeans.pdf
+
+engine: knitr
+---
+
+
+
+{{< include _preamble.qmd >}}
+
+
+```{r}
+#| echo: true
+#| message: false
+#| code-fold: true
+stopifnot(
+  require(gt),
+  require(sloop),
+  require(lobstr), 
+  require(skimr),
+  require(GGally),
+  require(patchwork),
+  require(ggforce),
+  require(glue),
+  require(ggfortify),
+  require(ggvoronoi),
+  require(magrittr),
+  require(broom),
+  require(tidyclust),
+  require(tidyverse)
+)
+
+tidymodels::tidymodels_prefer(quiet = TRUE)
+
+old_theme <-theme_set(
+  theme_minimal(base_size=9, 
+                base_family = "Helvetica")
+)
+```
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| eval: false
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  comment=NA,
+  prompt=FALSE,
+  cache=FALSE,
+  echo=TRUE,
+  results='asis'
+)
+```
+
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| 
+gc <- options(ggplot2.discrete.colour="viridis")
+gc <- options(ggplot2.discrete.fill="viridis")
+gc <- options(ggplot2.continuous.fill="viridis")
+gc <- options(ggplot2.continuous.colour="viridis")
+```
+
+Foreword
+--------
+
+
+This lab is dedicated to the *k-means* clustering method. In words, *k-means* takes as input a collection of points in $\mathbb{R}^d$ (a numerical dataset) and a positive integer $k$. It returns  a collection of $k$ points (the *centers*) from $\mathbb{R}^d$. The centers define a Voronoï *tesselation*/*partition*/*diagran* of $\mathbb{R}^d$. The Voronoï *cells* define a clustering of the original dataset.
+
+
+Voronoi tesselation/partition/diagram
+--------------------------------------
+
+[Wikipedia on Voronoï diagrams](https://en.wikipedia.org/wiki/Voronoi_diagram)
+
+In the next chunk, we generate a Voronoï diagram on $\mathbb{R}^2$ with $100$ cells defined from $100$ random points drawn from the uniform distribution on a square. 
+Function `stat_voronoi()` comes from [ggvoronoi](https://github.com/garretrc/ggvoronoi) 
+
+```{r voronoi}
+#| echo: true
+set.seed(45056)
+
+points <- tibble(
+  x=runif(100, 0, 1),
+  y=runif(100, 0, 1),
+  distance = sqrt((x-100)^2 + (y-100)^2)
+) 
+
+p <- ggplot(points) +
+    aes(x=x, y=y) +
+    geom_point(size=.2) +
+    coord_fixed() +
+    xlim(c(-.25, 2.25)) +
+    ylim(c(-.25, 2.25)) 
+
+p + (p + stat_voronoi(geom="path")) +
+  patchwork::plot_annotation(
+    title="Voronoi tesselation",
+    subtitle = "Left: 100 random points\nRight: Voronoï diagram")
+```
+
+::: {.callout-note}
+
+- Two adjacent Voronoï cells are separated by a (possibly semi-infinite)  line segment
+- Let the so-called *centers* be denoted by  $c_1, \ldots, c_n$. They form the *codebook* $\mathcal{C}$.  
+- The Voronoï cell with *center*  $c_i$ is defined by 
+$$\left\{x : x \in \mathbb{R}^d, \qquad \| x- c_i \|_2 = \min_{j \leq n} \|x -c_j\|_2\right\}$$
+- The center of a Voronoï cell is usually not its barycenter
+
+:::
+
+_k_-means objective function
+----------------------------
+
+
+
+::: {.callout-note}
+
+### Definition
+
+The $k$-means algorithm aims at building a _codebook_ $\mathcal{C}$ that minimizes
+
+$$\mathcal{C} \mapsto \sum_{i=1}^n \min_{c \in \mathcal{C}}  \Vert X_i - c\Vert_2^2$$
+
+over all codebooks with given cardinality
+
+If $c \in \mathcal{C}$ is the closest centroid to $X \in \mathbb{R}^p$,
+
+$$\|c - X\|^2$$ 
+
+is the _quantization/reconstruction error_ suffered when using codebook $\mathcal{C}$ to approximate $X$
+
+:::
+
+::: {.callout-caution}
+
+{{< fa exclamation-triangle >}} If there are no restrictions on the dimension of the input space, on the number of centroids, or on sample size, computing an optimal codebook is a $\mathsf{NP}$ -hard problem
+
+
+:::
+
+The `kmeans()` function
+-----------------------------
+
+
+
+
+`kmeans()` is a wrapper for a collection of Algorithms that 
+look like the Lloyd algorithm
+
+
+Initialize 
+: Choose $k$ centroids
+
+Iterations: Two phases
+
+Movement 
+: Assign each sample point to the closest centroid (Assign each sample point to a class in the Voronoi partition defined by the centroids)
+
+Update 
+: For each class in the current Voronoi partition, update the centroid so as to minimize the *Within Cluster Sum of Squared distances*.
+
+
+
+{{< fa hand-point-right >}} No guarantee to converge to a global optimum!
+
+Proceeed by trial and error.
+
+Repeat the algorithm and keep the best result.
+
+
+
+Iris data 
+----------
+
+::: {.callout-note title='Question'} 
+ 
+Run `kmeans()` on the projection of the Iris dataset  (`data(iris)`) on the `Petal` plane.
+
+Check `?iris` and [https://en.wikipedia.org/wiki/Iris_flower_data_set](https://en.wikipedia.org/wiki/Iris_flower_data_set) for more on this (historical) dataset. 
+
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+We look for a partition into three cells.
+
+```{r}
+#| label: voronoi_iris
+#| warning: false
+#| message: false
+#| 
+data(iris)
+
+kms <- iris |> 
+  select(starts_with("Petal")) |>
+  kmeans(3)
+
+class(kms)
+
+sloop::otype(kms)
+```
+
+The result is an object of class `kmeans`. The class is equiped with `broom` methods.  
+
+::: 
+:::
+
+
+::: {.callout-note title='Question'} 
+
+- Check the *attributes* of object `kms`
+- Unclass the object and check the attributes again.
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+attributes(kms)
+
+ukms <- unclass(kms)
+attributes(ukms)
+class(kms)
+
+kms_bornagain <- structure(
+  ukms, 
+  class="kmeans")
+
+sloop::otype(kms_bornagain)
+class(kms_bornagain)
+```
+ 
+Objects of class `kmeans` have two attributes `names`  and `class`. Because of the `class` attribute, objects of class `kmeans`  are not just lists with named elements.   
+
+
+::: 
+ 
+:::
+
+Summarizing a clustering 
+-------------------------
+
+::: {.callout-note title="Question"}
+
+Check the structure of objects of class `kmeans` and use `broom::tidy()` to get a summary. 
+
+Compare with `summary()` from base `R`
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+
+```{r iris3-tidy}
+df_centers <- select(iris, starts_with("Petal")) |>
+  kmeans(centers = 3) |> 
+  broom::tidy() 
+
+df_centers |>  
+  gt::gt() |>
+  gt::fmt_number(decimals = 2) |>
+  gt::tab_caption("Iris clustering in the Petal plane, kmeans with 3 clusters")
+```
+
+- How are the rows related to clusters?
+- What are the coordinates good for?
+- What does the `size` column mean?
+- `withinss` stands for *Within Sum of Squares*. How is it computed? Why is it useful?
+
+:::
+
+:::::
+
+
+Visualizing a clustering
+-------------------------
+
+::: {.callout-note  title="Question"}
+
+Use `broom::augment()` and `broom::tidy()` to prepare two dataframes that will allow you to overlay a scatterplot of the dataset and a Voronoï diagram defined by the centers output by `kmeans()`. 
+
+Compare the result with `plot()`
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+
+
+```{r}
+q <- kms |> 
+  augment(iris) |>
+  ggplot() +
+  aes(x=Petal.Length, 
+      y=Petal.Width
+      ) +
+  geom_point(aes(shape=Species), size=1, show.legend = F) +
+  coord_fixed()
+
+qq <-  (q + geom_point(aes(shape=Species, 
+                           colour=.cluster), 
+                       size=1))+
+  stat_voronoi(data = df_centers,   #<<
+               geom="path",
+               outline=data.frame(x=c(0, 7, 7, 0), 
+                                  y=c(0, 0, 3, 3))
+               ) +
+  geom_point(data = df_centers,   #<<
+             colour = "black",
+             shape="+",
+             size=5)  
+
+q / qq +
+  plot_annotation(title = "Kmeans over Iris dataset, k=3")
+
+```
+
+:::
+
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+
+
+```{r}
+geom_sugar <- list(
+    stat_voronoi(data = df_centers,
+                 geom="path",
+                 alpha=.5,
+                 outline = tribble(~x, ~y,
+                                   0., 0.,
+                                   7., 0.,
+                                   7., 3,
+                                   0., 3) 
+                 ),
+    geom_point(data = df_centers,   
+               colour = "black",
+               shape="+",
+               size=5),
+    coord_fixed(),
+    labs(col="Voronoï cells")
+)
+```
+
+
+
+
+
+
+```{r}
+broom::augment(kms, iris) |>
+  ggplot(aes(x=Petal.Length, y=Petal.Width)) +
+  geom_point(aes(shape=Species, color=.cluster)) +
+  geom_sugar 
+```
+
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+kms |> 
+  autoplot(data=iris)
+``` 
+:::
+
+:::::
+
+::: {.callout-note title="Question"}
+
+Redo the same operations but choose the `Sepal.xxx` dimension.
+
+Design a function to avoid repetitive coding.  
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+plot_km_centroids <- function(augmented_km, centroids, col1, col2){
+
+  outline <- augmented_km |>
+    dplyr::select({{col1}}, {{col2}}) |>
+    dplyr::rename(x={{col1}}, y={{col2}}) |> 
+    summarise(across(everything(), .fns=list("min"= min, "max"=max), .names="{.col}_{.fn}"))
+
+  tb_outline <- tibble(
+    x = with(outline, c(x_min-1.0, x_max+1.0, x_max+1.0, x_min-1.0)),
+    y = with(outline, rep(c(y_min-1, y_max+1), each=2)),
+    group=rep(1, 4)
+  )
+
+  p <- augmented_km |> 
+  ggplot() +
+  aes(
+    x={{col1}}, 
+    y={{col2}}) +
+  geom_point(aes(colour=.cluster))  +
+  stat_voronoi(data = centroids,
+               geom="path",
+               outline= tb_outline
+  ) +
+  geom_point(data = centroids,
+             colour = "black",
+             shape="+",
+             size=5) +
+  coord_fixed() +
+  theme_minimal()
+
+  if (has_rownames(augmented_km)) {
+    p <- p +
+      ggrepel::geom_label_repel(
+        aes(colour=.cluster, 
+            label=`.rownames`))
+  }
+
+  return(p)
+}
+```
+
+ 
+:::
+
+```{r iriskmeans3}
+kms <- kmeans(select(iris, Sepal.Length, Sepal.Width), 3)
+
+
+plot_km_centroids(
+  augment(kms, iris), 
+  tidy(kms), 
+  Sepal.Length, 
+  Sepal.Width
+)
+```
+:::::
+
+
+Playing with $k$ 
+-----------------
+
+The number of cells/clusters may not be given a priori. Conducting clustering using 
+a method like `kmeans` requires picking a reasonable choice for `k`. 
+
+::: {.callout-note}
+
+### Question
+
+Perform kmeans clustering with $k=2$.  Use `glance`, `tidy`, `augment` to discuss the result.
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+
+```{r iriskmeans2}
+df <- select(iris, 
+             starts_with("Sepal"))
+
+kms <- kmeans(df, 2)
+```
+
+```{r iriskmeans2bis}
+plot_km_centroids(
+  augment(kms, iris),
+  tidy(kms),
+  Sepal.Length,
+  Sepal.Width
+)
+```
+
+We can compare the spread between inner and outer sum of squares for clusterings 
+with $k \in 2, 3$. 
+
+```{r}
+bind_rows(glance(kms),
+          glance(kmeans(df, centers=3,
+              nstart = 32L))) |> 
+  mutate(k=c(2, 3))  |>
+  gt::gt()
+```
+ 
+:::
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+Perform k-means for $k=2, ... 10$, plot within sum of squares as function of $k$. 
+Comment. 
+
+:::
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+tmp <-map_dfr(2:10, ~ glance(kmeans(df, 
+                                   centers=.,
+                                   nstart = 32L))) |> 
+  rowid_to_column(var="k") |> 
+  mutate(k=k+1, across(where(is.numeric), ~ signif(.x, 3))) 
+```
+
+```{r iriswithinss}
+tmp |>
+  ggplot(aes(x=forcats::as_factor(k), y=tot.withinss/totss)) +
+  geom_col(width=.25) +
+  ggtitle("Iris data", "WithinSS/Total Sum of Squares as a function of k") +
+  xlab("k") +
+  ylab("Within Clusters Sum of Squares (relative)") +
+  scale_x_discrete(breaks=as.character(2:10), labels=as.character(2:10))
+```
+
+```{r iriskmeans4}
+kms <- kmeans(df, 4)
+iris4 <- broom::augment(kms, iris)
+
+
+plot_km_centroids(
+  augment(kms, iris),
+  tidy(kms),
+  Sepal.Length,
+  Sepal.Width
+)  +
+ ggtitle(label="Kmeans Iris data",
+         subtitle="k=4") +
+ labs(col="Clusters")
+```
+
+
+```{r}
+broom::tidy(kmeans(df, 4)) |>
+  gt::gt() |>
+  gt::fmt_number(decimals = 2)
+```
+
+
+:::::   
+
+
+Lloyd's iterations 
+---------------------
+
+The `kmeans` function does not minimize the `kmeans` cost. It offers a collection 
+of iterative algorithms that aim at approximately minimizing the cost. 
+
+
+::: {.callout-note}
+
+Initialize 
+: Choose $k$ centroids
+
+Iterations: Two phases
+
+Movement 
+: Assign each sample point to the closest centroid (Assign each sample point to a class in the Voronoi partition defined by the centroids)
+
+Update 
+: For each class in the current Voronoi partition, update the centroid so as to minimize the *Within Cluster Sum of Squared distances*.
+
+
+:::
+
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+
+
+```{r}
+#| warning: false
+#| message: false
+#| 
+km <- list(centers=df[1:3, ]) # stupid initialization
+
+sequence <- list()
+
+for (i in 1:20) {
+  km <- kmeans(df,
+               km$centers,
+               algorithm = "Lloyd",
+               iter.max = 1)
+  sequence[[length(sequence)+1]] <- force(km)
+}
+```
+
+```{r}
+add_voronoi <- function(p, kmscenters, marker){
+  p +
+    geom_point(data=data.frame(kmscenters),         #<<
+               mapping=aes(x=Sepal.Length, y=Sepal.Width),
+               shape=marker,
+               col="black",
+               size=5) +
+    stat_voronoi(data = as.data.frame(kmscenters),  #<<
+                 aes(x=Sepal.Length,y=Sepal.Width),
+                 geom="path",
+                 outline=data.frame(x=c(4, 8, 8, 4),
+                                    y=c(2, 2, 4.5, 4.5)))
+}
+```
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+
+```{r lloyd1}
+i <- 2
+
+p <- broom::augment(sequence[[i]], iris) |>
+  ggplot() +
+  coord_fixed(ratio=1) +
+  geom_point(aes(x=Sepal.Length, y=Sepal.Width, shape=Species, col=.cluster)) +
+  ggtitle("Kmeans Lloyd's algorithm", "Iris data")
+
+p |>
+  add_voronoi(sequence[[i]]$centers, marker="o") +   #<<
+  labs(colour=paste("Cluster, step ", i- 1))
+```
+
+```{r}
+i <- 2
+
+(p %+%
+  broom::augment(sequence[[i]], iris)) |>
+  add_voronoi(sequence[[i]]$centers, marker='+') +   #<<
+  geom_point(data=data.frame(sequence[[2]]$centers),   #<<
+             mapping=aes(x=Sepal.Length, y=Sepal.Width),
+             shape="o", col="black", size=5) +
+  labs(colour=paste("Cluster, step ", i- 1))
+```
+
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+
+```{r lloyd5}
+i <- 3
+
+(p %+%
+  broom::augment(sequence[[i]], iris)) |>
+  add_voronoi(sequence[[i]]$centers, marker='+') +   #<<
+  geom_point(data=data.frame(sequence[[2]]$centers),   #<<
+             mapping=aes(x=Sepal.Length, y=Sepal.Width),
+             shape="o", col="black", size=5) +
+  labs(colour=paste("Cluster, step ", i- 1))
+```
+
+
+```{r}
+#| label: lloyd00
+i <- 5
+
+(p %+%
+  broom::augment(sequence[[i]], iris)) |>
+  add_voronoi(sequence[[i]]$centers, marker='*') +   #<<
+  geom_point(data=data.frame(sequence[[2]]$centers),   #<<
+             mapping=aes(x=Sepal.Length, y=Sepal.Width),
+             shape="o", col="black",size=5) +
+  labs(colour=paste("Cluster, step ", i- 1))
+```
+
+:::
+
+:::::
+
+
+Revisiting the `swiss` fertility data
+-------------------------------------
+
+::: {.callout-note title='Question'} 
+ 
+Recall the dataset used in [Lab PCA](/core/labs/lab-pca.qmd)
+
+Perform kmeans clustering in original coordinates and kmeans clustering in the first principal coordinates plane 
+
+Compare the results
+
+:::
+
+
+::: {.content-visible when-profile="solution"} 
+::: {.callout-tip title="solution"} 
+
+
+```{r}
+data(swiss)
+
+swiss_scaled <- swiss |>  
+  select(-Fertility) |> 
+  scale() 
+
+km.2.swiss <- swiss_scaled |> 
+  kmeans(centers = 2,  nstart = 10L)
+
+df_centers.2 <- broom::tidy(km.2.swiss)
+```
+
+
+:::
+
+::: {.callout-tip title="solution"} 
+
+```{r}
+km.2.swiss.pca <-  swiss_scaled |>
+  prcomp() |> 
+  augment(data=swiss)|> 
+  dplyr::select(starts_with(".fittedPC")) |> 
+  kmeans(centers=2, nstart = 10L)
+
+df_centers.2.pca <- tidy(km.2.swiss.pca)
+```
+
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+::: {.columns}
+::: {.column}
+
+```{r}
+df_centers.2 |>
+  gt::gt() |> 
+  gt::fmt_number(decimals = 2)
+```
+
+```{r}
+km.2.swiss |> 
+  broom::glance() |>
+  gt::gt() |> 
+  gt::fmt_number(decimals = 2)
+```
+
+:::
+
+::: {.column}
+
+```{r}
+df_centers.2.pca |>
+  gt::gt() |> 
+  gt::fmt_number(decimals = 2)
+```
+
+
+```{r}
+km.2.swiss.pca |> 
+  broom::glance() |>
+  gt::gt() |> 
+  gt::fmt_number(decimals = 2)
+```
+:::
+:::  
+ 
+:::
+
+::: {.callout-tip title="solution"} 
+
+
+
+```{r}
+#| eval: true
+#| label: kmeans-swiss-individuals
+#| warning: false
+#| message: false
+
+plot_km_centroids(
+  broom::augment(km.2.swiss, scale(swiss)),
+  broom::tidy(km.2.swiss), 
+  Education, 
+  Infant.Mortality
+) +
+  labs(
+    title= "Kmeans over Swiss dataset, k=2"
+  ) 
+```
+:::
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+#| eval: true
+#| label: kmeans-swiss-individuals-pca
+#| warning: false
+#| message: false
+
+plot_km_centroids(
+  augment(km.2.swiss.pca,
+         broom::augment(prcomp(swiss_scaled), data=swiss)),
+  tidy(km.2.swiss.pca),
+  .fittedPC1,
+  .fittedPC2
+) + labs(
+      title="Kmeans over Swiss dataset, k=2",
+      subtitle="Clustering over the Principal components"
+  ) 
+```
+:::
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+#| eval: true
+km.4.swiss.pca <-  swiss_scaled |>
+  prcomp() |> 
+  broom::augment(data=swiss)|> 
+  dplyr::select(starts_with(".fittedPC")) |> 
+  kmeans(centers=4, nstart = 10L)
+
+df_centers.4.pca <- broom::tidy(km.4.swiss.pca)
+``` 
+
+
+```{r}
+#| eval: true
+plot_km_centroids(
+  augment(km.4.swiss.pca,
+         broom::augment(prcomp(swiss_scaled), data=swiss)),
+  tidy(km.4.swiss.pca),
+  .fittedPC1,
+  .fittedPC2
+) + labs(
+      title="Kmeans over Swiss dataset, k=4",
+      subtitle="Clustering over the Principal components"
+  ) 
+```
+
+::: 
+:::
+
+Revisiting the `mortality` dataset 
+-----------------------------------
+
+::: {.callout-note title='Question'} 
+ 
+Recall the dataset used in [Lab CA](/core/labs/lab-ca-mortality.qmd)
+
+Perform kmeans clustering of categories in the row principal coordinates 
+and the column principal coordinates 
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+:::
+
+
+
+
+
+
+References
+----------
+
+[Vignette `k_means` from `tidyclust`](https://tidyclust.tidymodels.org/articles/k_means.html)
+
+

@@ -1256,10 +1256,13 @@ sloop::s3_get_method(autoplot.prcomp)
 
 ::: {.content-hidden}
 
+
+##  kmeans over `swiss` dataset
+
+
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
 
-### kmeans
 
 ```{r}
 km.2 <- swiss %>%  

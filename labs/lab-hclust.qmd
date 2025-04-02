@@ -1,0 +1,546 @@
+---
+title: "Lab: Hierarchical Clustering"
+date: "`r Sys.time()`"
+
+execute:
+  echo: true
+  eval: true
+  collapse: true
+  message: false
+  warning: false
+
+format:
+  html:
+    output-file: lab-hclust.html
+  pdf:
+    output-file: lab-hclust.pdf
+
+engine: knitr
+---
+
+
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| echo: true
+#| message: false
+#| code-fold: true
+stopifnot(
+  require(gt),
+  require(skimr),
+  require(GGally),
+  require(patchwork),
+  require(ggforce),
+  require(glue),
+  require(ggfortify),
+  require(ggvoronoi),
+  require(magrittr),
+  require(broom),
+  require(ggdendro),
+  require(dendextend),
+  require(plotly),
+  require(tidyverse)
+)
+
+tidymodels::tidymodels_prefer(quiet = TRUE)
+
+old_theme <-theme_set(
+  theme_minimal(base_size=9, 
+                base_family = "Helvetica")
+)
+```
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| 
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  comment=NA,
+  prompt=FALSE,
+  cache=FALSE,
+  echo=TRUE,
+  results='asis'
+)
+```
+
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| 
+gc <- options(ggplot2.discrete.colour="viridis")
+gc <- options(ggplot2.discrete.fill="viridis")
+gc <- options(ggplot2.continuous.fill="viridis")
+gc <- options(ggplot2.continuous.colour="viridis")
+```
+
+Preamble
+---------
+
+Hierarchical clustering builds *dendrograms*
+
+Explore the data structure: dendrograms (objects of class `dendrogram`) are represented by *lists of lists  with attributes* (not by `tibbles`). 
+
+The dendrograms created from objects of class `hclust` represent *planar binary trees*. 
+
+::: {.callout-note}
+
+### Question
+
+- How do you define abstractly planar binary trees?
+- In dendrograms created from objects of class `hclust`, what do the leaf nodes represent? 
+- In dendrograms created from objects of class `hclust`, what do the internal nodes represent ?
+
+:::
+
+::: {.callout-tip}
+
+Keep an eye on  [Introduction to dendextend](https://cran.r-project.org/web/packages/dendextend/vignettes/dendextend.html#a-dendrogram-is-a-nested-list-of-lists-with-attributes) by the package author Tal Galili. 
+
+
+:::
+
+
+Playing with a toy dendrogram
+-----------------------------
+
+
+```{r}
+dend <- 1:5 %>% 
+  dist %>% 
+  hclust(method="ward.D2") %>% 
+  as.dendrogram
+```
+
+Nodes are identified by their prefix order index (note that this depend on the chosen rotation). 
+
+```{r}
+dend %>%  
+  rotate(c(1,2,4,5,3)) %>% 
+  get_nodes_attr("members", 
+                 id = c(1, 2, 5, 7)) 
+
+
+```
+
+
+```{r}
+cophenetic(rotate(dend, c(1,2,4,5,3)))
+cophenetic(dend)
+```
+
+```{r}
+dend %>% 
+  rotate(c(1,2,4,5,3)) %>% 
+  get_nodes_attr("height") 
+```
+
+```{r}
+as.ggdend(rev(dend))
+```
+
+
+```{r}
+# kmeans(tibble(x=1:5), centers = 2)
+```
+
+
+
+```{r}
+# Get various attributes
+dend %>% 
+  get_nodes_attr("height") # node's height
+```
+How is attributed `height` computed? What is its purpose? 
+
+What kind of tree traversal is used by `get_nodes_...` helpers?
+
+
+```{r}
+dend %>% 
+  get_nodes_attr("members")
+
+```
+
+
+Tweaking a dendrogram
+-----------------------
+
+Why should we do that? 
+
+
+How should we do that? 
+
+```{r}
+
+```
+
+
+USArrests
+---------
+
+We work on `USArrests` dataset. We want to classify the 50 (united) states on the basis of the arrests profile and the urbanization rate. We rely on hierarchical, bottom-up classification.
+
+```{r}
+data("USArrests")
+
+USArrests <- USArrests %>% 
+    tibble::rownames_to_column(var="region")
+
+USArrests <- USArrests %>%
+    mutate(region = tolower(region))
+
+rownames(USArrests) <- USArrests$region
+
+glimpse(USArrests)
+```
+
+```{r}
+source("./UTILS/make_biotiful.R")
+```
+
+```{r}
+make_biotifoul(USArrests, .f=is.numeric)
+```
+
+The function `dist` is used to calculate pairwise distances between individuals. 
+
+::: {.callout-note}
+
+### Question 
+
+Compute pairwise distances between rows of `USArrests` (with and without scaling)
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+```{r}
+dist.1 <-  USArrests %>% 
+    select(where(is.numeric)) %>% 
+    dist()
+```
+
+```{r}
+dist.2 <- USArrests %>% 
+    select(where(is.numeric)) %>% 
+    scale %>% 
+    dist()
+```
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+Perform hierarchical clustering on *unscaled* and *scaled* dataset.
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+```{r}
+hcl.1 <- hclust(dist.1, method = "ward.D2")
+hcl.2 <- hclust(dist.2, method = "ward.D2") # scaled
+```
+
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+
+
+:::
+
+
+```{r}
+mutate(USArrests, 
+       .cluster = factor(cutree(hcl.1, 5))) %>% 
+  inner_join(map_data("state"), by = "region") %>%
+  ggplot() +
+  aes(x=long, y=lat, group=region, fill=.cluster) +
+  geom_polygon() +
+  scale_fill_viridis_d() +
+  ggtitle("Components of arrest data") +
+  theme(legend.position = "none")
+```
+
+The `dendrogram` class
+----------------------
+
+::: {.callout-note}
+
+### Question
+
+Exploration of results of hierarchical clustering (objects of class `hclust`) is facilitated by converting to class `dendrogram`.
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+```{r}
+dend.1 <- hcl.1 %>% 
+  as.dendrogram()
+
+length(dend.1[[1]][[2]])
+
+```
+
+
+```{r}
+class(dend.1)
+class(unclass(dend.1))
+
+methods(class=class(dend.1)) %>% head()
+```
+
+```{r}
+dend.1 %>% head()
+```
+
+
+```{r}
+dend.1 %>% 
+  ggdendrogram(rotate = TRUE,labels = T) +
+  ggtitle("Dendrogram for USArrests") +
+  ggdendro::theme_dendro() +
+  scale_y_reverse(expand = c(0.2, 0))
+```  
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+
+
+:::
+  
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+# label(dend.1)
+
+dend.2 <-  as.dendrogram(hcl.1)
+# order it the closest we can to the order of the observations:
+dend.2 <- rotate(dend.2, 1:50)
+# Color the branches based on the clusters:
+dend.2 <- color_branches(dend.2, k=3) #, groupLabels=iris_species)
+# Manually match the labels, as much as possible, to the real classification of the flowers:
+# labels_colors(dend.2) <-
+#    rainbow_hcl(3)[sort_levels_values(
+#       as.numeric(iris[,5])[order.dendrogram(dend.2)]
+#    )]
+```
+
+
+:::::  
+
+
+Ward method 
+-----------
+
+
+The `meth=ward.D2` option allows you to aggregate individuals according to the method of Ward, that is, according to the variance.
+
+::: {.callout-note}
+
+### Question
+
+What is the distance used? Describe the method of *classification by variance*?
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+The output `clas$height` gives the jump height of the dendrogram to
+each new iteration. In the case of Ward's method, she
+is proportional to the loss of inter-class variance.
+
+
+:::::
+
+::: {.callout-note}
+
+### Question
+
+1. How many groups are there at step 0? at the last step?
+
+2.  How many iterations are there?
+
+3.  Recall the definition of inter-class variance.
+
+4.  What is the inter-class variance at step 0? at the last
+step? How is it going according to the number of groups
+(or according to the number of iterations)?
+
+5.  By comparing the total inertia and the `clas$height' output,
+find the coefficient of proportionality between the loss of
+inter-class variance and height of jumps.
+
+
+:::
+
+
+Choice of the number of classes
+-------------------------------
+
+::: {.callout-note}
+
+### Question
+
+1.  Plot the curve corresponding to the loss of variance inter in
+as a function of the number of iterations :
+
+2.  Select the "optimal" number of classes.
+
+3.  Verify that, for the number of classes chosen, the number by
+class is sufficient (we can use the `cutree` function).
+
+4.  These classes can be represented using a dendrogram
+
+5.  You can also colour the leaves of the tree corresponding to
+ a class. To do this, install and load the package `dendextend'.
+
+
+:::
+
+
+
+Link with PCA 
+-------------
+
+
+We will represent the classes obtained in the
+factorial design(s) obtained by the PCA. This will make it possible to represent the classes and describe them according to the variables initials.
+
+
+::: {.callout-note}
+
+### Question
+
+Represent the coordinates of the individuals in each group in
+the first factorial plane (with one color for each class).
+The vector generated by `cutree' can be used to form a
+color vector. Interpretation.
+
+
+:::
+
+
+
+
+```{r}
+mutate(USArrests, 
+       .cluster = factor(cutree(hcl.1, 10))) %>% 
+  inner_join(map_data("state"), by = "region") %>%
+  ggplot() +
+  aes(x=long, y=lat, group=region, fill=.cluster) +
+  geom_polygon() +
+  scale_fill_viridis_d() +
+  ggtitle("Components of arrest data") +
+  theme(legend.position = "none")
+```
+
+
+
+```{r}
+#data(france)
+```
+
+
+```{r}
+(map_data("state") %>%
+  ggplot() +
+  aes(x=long, 
+      y=lat, 
+      label=factor(region), 
+      fill = factor(region)) +
+  geom_polygon() +
+  scale_fill_viridis_d() +
+  ggtitle("USA") +
+  theme(legend.position = "none")) |> 
+    ggplotly()
+```
+
+Cophenetic distance
+-------------------
+
+::: {.callout-note}
+
+### Question
+
+:::
+
+
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+dist.coph.1 <- cophenetic(dend.1)
+```
+
+
+:::::
+
+
+Cophenetic distance between dendrograms 
+----------------------------------------
+
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+```{r}
+data("iris")
+
+hcl.iris <- iris %>% 
+  select(where(is.numeric)) %>% 
+  scale() %>% 
+  dist() %>% 
+  hclust(meth="ward.D2")
+
+dend.iris <-  dendro_data(hcl.iris)
+
+dend.iris %$% (
+  ggplot() +
+  geom_segment(data = segments,
+               aes(x = x, y = y,
+                   xend = xend, yend = yend)
+  ) +
+  geom_text(data = labels,
+            aes(x = x, y = y,
+                label = label, hjust = 0),
+            size = 3
+  ) +
+  coord_flip() +
+  scale_y_reverse(expand = c(0.2, 0))
+)
+  
+```
+:::::
+
+
+
+
+References
+--------------
+
+[`ggdendro`](https://andrie.github.io/ggdendro/)
+
+[`dendroextra`](https://github.com/jefferis/dendroextras)
+
+[`hier_clust`, `tidyclust`](https://tidyclust.tidymodels.org/articles/hier_clust.html)
