@@ -1,1 +1,477 @@
-  eval: false
+---
+title: "Lab: Canonical Correlation Analysis"
+date: "`r Sys.time()`"
+
+
+format:
+  html:
+    output-file: lab-cca.html
+  pdf:
+    output-file: lab-cca.pdf
+ 
+engine: knitr
+
+execute: 
+  eval: true
+  echo: true
+  collapse: true
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| include: false
+stopifnot(
+  require("testthat"),
+  require("corrr"),
+  require("magrittr"),
+  require("lobstr"),
+  require("sloop"),
+  require("ggforce"),
+  require("gt"),
+  require("glue"),
+  require("skimr"),
+  require("patchwork"), 
+  require("tidyverse"),
+  require("ggfortify"),
+  require("viridisLite")
+  # require("autoplotly")
+)
+```
+
+## Canonical Correlation Analysis 
+
+$$C(X,Y) = \mathbb{E}\left[X Y^\top\right]$$
+
+$$\begin{bmatrix} C_{xx} & C_{xy} \\ C_{xy}^{\top} & C_{yy}\end{bmatrix}$$
+
+
+
+
+
+The first canonical components are the solution of the next problem 
+
+::: {.callout-note title="Optimization problem"}
+
+$$\begin{array}{lll}\text{Maximize} & & u^\top C_{xy}  v \\\text{subject to} & & u^\top C_{xx} uv=1 =v^\top C_{yy} v     \end{array}$$
+
+:::
+
+
+
+
+::: {.callout-note title="Proposition"}
+
+Let 
+
+$$U \times D \times V^\top$$
+
+be a SVD of 
+
+$$C_{xx}^{-1/2} \times C_{xy} \times C_{yy}^{-1/2}$$
+
+The solution to the optimization problem above is 
+
+$$a = C_{xx}^{-1/2} u_1 \qquad \text{and} \qquad b= S_{yy}^{-1/2} v_1$$
+
+where $u_1$ and $v_1$ are the leading left and right singular vectors of  $C_{xx}^{-1/2} \times C_{xy} \times C_{yy}^{-1/2}$, that is the first column vectors of $U$ and $V$.
+
+:::
+
+<!-- This is also related to the extended SVD of $C_{xy}$ relatively to $C_{xx}^{-1}$ and $C_{yy}^{-1}$ -->
+
+Proof:  {{< fa chalkboard-teacher >}}
+
+::: {.callout-note title="Proposition"}
+
+A sequence of canonical components of $C_{xy}$ can be obtained 
+from the sequence of (extended) left and right singular vectors of $C_{xy}$ with respect 
+to $C_{xx}$ and $C_{yy}$ 
+
+:::
+
+Proof:  {{< fa chalkboard-teacher >}}
+
+
+::: {.callout-note title="Proposition"}
+
+Let $H_X$ (resp. $H_Y$) be orthorgonal projection matrix on the linear space spanned by the columns of $X$ (resp. $Y$).
+
+Canonical correlations $ρ_1 \geq \ldots \geq \rho_s, \ldots$ are the positive
+square roots of the eigenvalues $\lambda_1, \ldots \geq \lambda_s, \ldots$ of $H_X \times H_Y$ 
+(which are the same as $H_Y \times H_X$): $ρ_s = λ_s$ 
+
+Vectors $U^1, \ldots, U^{p_1}$  are the standardized eigenvectors corresponding to the decreasing
+eigenvalues $λ_1 \geq \ldots \geq \lambda_{p_1}$  of $H_X  \times H_Y$
+
+Vectors $V^1, \ldots, V^{p_2}$  are the standardized eigenvectors corresponding to the decreasing
+eigenvalues $λ_1 \geq \ldots \geq \lambda_{p_2}$  of $H_X  \times H_Y$
+
+
+:::
+
+
+
+## Canonical Correlation Analysis (CCA) in `R`
+
+###  `cancor()` from base package  `R`
+
+Function `cancor(x, y, xcenter=T, ycenter=T)` computes the *canonical correlations* between two data matrices `x` and `y`.
+Henceforth we assume that the columns of `x` and `y` are centered.
+Matrices `x` and `y` have the same number $n$ of rows. `x` (resp. `y`) has `p1` (resp. `p2`) columns.
+
+> The canonical correlation analysis seeks linear combinations of the `y` variables which are *well explained* by linear combinations of the `x` variables. The relationship is symmetric as *well explained* is measured by correlations.
+
+The result is a list of five  components 
+
+- `cor`	 correlations.
+- `xcoef`	 estimated coefficients for the `x` variables.
+- `ycoef`	 estimated coefficients for the `y` variables.
+
+Our assumption above allows us to assume  `xcenter` and `ycenter` are zeros.
+
+The next example is taken from the documentation. Use `?LiveCycleSavings` to get more information on the dataset.
+
+```{r}
+#| label: LifeCycleSavings
+LifeCycleSavings |> 
+  as_tibble() |>
+  slice_sample(n=5)
+```
+
+```{r}
+#| label: fm1
+fm1 <- lm(sr ~ pop15 + pop75 + dpi + ddpi, data = LifeCycleSavings)
+ 
+summary(fm1)
+```
+
+```{r}
+#| label: cancor
+pop <- LifeCycleSavings |> 
+  dplyr::select(starts_with('pop'))
+oec <- LifeCycleSavings |> 
+  dplyr::select(-starts_with('pop'))
+  
+res.cca <- cancor(pop, oec)
+
+res.cca$cor
+```
+
+This tells us that highest possible linear correlation beween a linear combination of `pop15, pop75` and a linear combination of 
+`sr, dpi, ddpi` is `res.cca$cor[1]`. The coefficients of the 
+corresponding linear combinations can be found on the rows of 
+components `xcoef`  and `ycoef`
+
+::: {.callout-note title='Question'} 
+ 
+Check that the different components of the output of `cancor()` satisfy all 
+properties they should satisfy. 
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+#| label: check-cancor
+cc <- cor(
+  as.matrix(pop) %*% as.matrix(res.cca$xcoef), 
+  as.matrix(oec) %*% as.matrix(res.cca$ycoef)
+  )
+
+diag(cc) - res.cca$cor
+``` 
+
+
+:::
+
+:::
+
+::: {.callout-note title='Question'} 
+ 
+Design a suite of tests (using `testthat`) that any contender of the implementation provided by package `stats` should pass.  
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+TODO
+
+:::
+
+:::
+
+### Package `CCA` 
+
+Abstract of [CCA: An R Package to Extend Canonical Correlation Analysis](https://www.jstatsoft.org/article/view/v023i12)
+
+> Canonical correlations analysis (CCA) is an exploratory statistical method to highlight correlations between two data sets acquired on the same experimental units. The `cancor()` function in `R` (`R` Development Core Team 2007) performs the core of computations but further work was required to provide the user with additional tools to facilitate the interpretation of the results. 
+
+
+As in PCA, CA, MCA, several kinds of graphical representations can be displayed from the results of CCA: 
+
+1. a barplot of the squared canonical correlations (which tells us about the low rank approximations of $H_X \times H_Y$)
+1. scatter plots for the initial variables $X^j$ and $Y^k$ (ako correlation circles)
+1. scatter plots for the individuals (rows)
+1. biplots  
+  
+
+
+
+
+## Applications 
+
+
+::: {.callout-note title='Question'} 
+ 
+1. Load `nutrimouse` dataset from `CCA`.
+2. Insert the 4 elements of list `nutrimouse` in the global environment (see `list2env()`)
+
+
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+#| warning: false
+#| message: false
+stopifnot(
+  require(CCA)
+)
+
+data("nutrimouse")
+
+e <- list2env(nutrimouse, .GlobalEnv)
+```
+ 
+::: 
+ 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+- Compute the cross correlation matrix between `gene` and `lipid` 
+- Visualize the cross correlation matrix
+  
+:::
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+Y <- as.matrix(gene)   # 40 x 120
+X <- as.matrix(lipid)  # 40 x 20
+```
+
+```{r}
+c_XY = corrr::correlate(cbind(X, Y))
+```
+
+```{r}
+c_XY_long <- c_XY |>
+  tidyr::pivot_longer(cols=-c(term), names_to="term2", values_to="cor")  
+```
+
+```{r}
+p  <- c_XY_long |>
+  dplyr::filter(
+    term %in% names(gene),
+    term2 %in% names(lipid)
+  ) |>
+  ggplot() +
+  aes(x=term2, y=term, fill=abs(cor)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  xlab("diet") +
+  ylab("gene")
+
+p |> plotly::ggplotly()
+```
+
+
+::: 
+ 
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+- Compute the canonical correlations between `gene` and `lipid`, save the result in `res.cca` 
+- Check the canonical correlations. 
+- Comment
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+res.cca <- cancor(as.matrix(gene), as.matrix(lipid))
+```
+
+```{r}
+sum(res.cca$cor)
+```
+
+$H_X\times H_Y$ has 21 eigenvalues   equal to $1$. As the subspaces defined by the columns 
+in `gene` and `lipid` have dimensions at most `21` and `40`, $H_X\times H_Y$ equals 
+the projection of $\mathbb{R}^{40}$ over the smallest subspace. 
+
+
+
+:::
+
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+Sample 10 columns from `gene` and `lipid` and repeat the operation 
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+
+```{r}
+set.seed(42)
+n <- 10
+
+ss_gene <- gene |>
+  dplyr::select(sample(names(gene),  n)) |>
+  scale()
+
+ss_lipid<- lipid |>
+  dplyr::select(sample(names(lipid),  n)) |>
+  scale()
+
+res.cca <- cancor(as.matrix(ss_gene), as.matrix(ss_lipid)) 
+
+res.cc <- cc(X=as.matrix(ss_gene), Y=as.matrix(ss_lipid))
+```
+::: 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+Screeplot 
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+res.cca$cor |> 
+  as_tibble() |>
+  gt::gt() |>
+  gt::fmt_scientific() |>
+  gt::tab_caption("Canonical correlations between `gene` columns of nutrimouse and  `lipid` columns")
+``` 
+
+```{r}
+res.cca$cor |> 
+  as_tibble() |>
+  mutate(PC=as.factor(1:n), eig=value^2, percent=eig, cumulative=cumsum(eig)) |>
+  ggplot() +
+    aes(x=PC, y=eig, label=eig) +
+    geom_col(fill="white", color="black") +
+    theme_minimal() +
+    labs(
+      title="Squared Canonical Correlations",
+      subtitle="sample of 10 genes and 10 lipids", 
+      caption="nutrimouse data"
+    )
+```
+
+
+::: 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+Build a correlation circle  
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+
+
+We use function `plt.cc` from `CCA`. 
+
+```{r}
+CCA::plt.cc(
+  res.cc, 
+  var.label=T,
+  ind.names = str_c(genotype, diet, sep="-")
+)
+``` 
+:::
+
+:::
+
+::: {.content-hidden when-format="html"}
+
+## Package `vegan`
+
+
+```{r}
+stopifnot(
+  require(vegan)
+)
+
+
+```
+
+
+```{r}
+data(mite)
+# Two mite species associations (Legendre 2005, Fig. 4)
+group.1 <- c(1,2,4:8,10:15,17,19:22,24,26:30)
+group.2 <- c(3,9,16,18,23,25,31:35)
+# Separate Hellinger transformations of the two groups of species 
+mite.hel.1 <- decostand(mite[,group.1], "hel")
+mite.hel.2 <- decostand(mite[,group.2], "hel")
+rownames(mite.hel.1) = paste("S",1:nrow(mite),sep="")
+rownames(mite.hel.2) = paste("S",1:nrow(mite),sep="")
+out <- CCorA(mite.hel.1, mite.hel.2)
+out
+biplot(out, "ob")                 # Two plots of objects
+biplot(out, "v", cex=c(0.7,0.6))  # Two plots of variables
+biplot(out, "ov", cex=c(0.7,0.6)) # Four plots (2 for objects, 2 for variables)
+biplot(out, "b", cex=c(0.7,0.6))  # Two biplots
+biplot(out, xlabs = NA, plot.axes = c(3,5))    # Plot axes 3, 5. No object names
+biplot(out, plot.type="biplots", xlabs = NULL) # Replace object names by numbers
+
+```
+
+:::
+
+
+## References 
+
+[https://www.jstatsoft.org/article/view/v023i12](https://www.jstatsoft.org/article/view/v023i12)

@@ -1,0 +1,1072 @@
+--- 
+title: "Hierarchical Clustering"
+categories: [Hierarchical clustering]
+date: "2025-04-02 (updated: `r Sys.Date()`)"
+
+execute:
+  echo: false
+  eval: true
+
+format: 
+  revealjs:
+    header: "Hierarchical Clustering"
+
+engine: knitr
+--- 
+
+
+
+```{r, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+stopifnot(
+  require("ggdendro"),
+  require("fastcluster"),
+  require("dendextend"),
+  require("magrittr"),
+  require(tidyverse)
+)
+data("iris")
+data("USArrests")
+
+```
+
+
+
+
+
+```{r, echo=FALSE}
+# knitr::opts_chunk$set(
+#   fig.height = 4
+# )
+```
+
+
+
+
+
+
+
+
+
+
+
+# Hierarchical clustering {background-color="#1c191c"}
+
+
+::: {.notes}
+
+- Dendrogram : what is it?
+- From dendrogram to clusterings: cutting a dendrogram
+- Grow a dendrogram
+- Displaying a dendrogram
+- Validation and assesment
+
+:::
+
+##
+
+> Hierarchical clustering [...] is a method of cluster analysis which seeks to build a hierarchy of clusters 
+> 
+> from Wikipedia
+
+. . .
+
+Recall that a clustering is a _partition_ of some dataset
+
+A partition $D$ of $\mathcal{X}$ is a _refinement_ of another partition $D'$
+if every class in $D$ is a subset of a class in $D'$. Partitions $D$ and $D'$ are
+said to be _nested_
+
+. . .
+
+A hierarchical clustering of $\mathcal{X}$ is a sequence of  $|\mathcal{X}|$ nested partitions  of $\mathcal{X}$, starting from the trivial partition into  $|\mathcal{X}|$ singletons and ending  into the trivial partition in $1$ subset ( $\mathcal{X}$ itself)
+
+A hierarchical clustering consists of $|\mathcal{X}|$ nested flat clusterings
+
+We will explore _agglomerative_ or _bottom-up_ methods to build hierarchical clusterings
+
+
+
+## Hierchical clustering and dendrogram  {.smaller}
+
+
+::: {columns}
+
+::: {.column width="35%"}
+
+The result of hierarchical clustering is a _tree_ where _leafs_ are labelled by sample points and
+internal nodes correspond to merging operations
+
+The tree conveys more information: if the tree is properly decorated, it is possible to reconstruct the different merging steps and to know which rule was applied when some merging operation was performed
+
+The tree is called a _dendrogram_
+
+:::
+
+::: {.column}
+
+```{r, echo=FALSE}
+#| fig-width: 8
+hclust(dist(USArrests), "ave") %>% 
+  dendro_data(type = "rectangle") %$% {
+  ggplot() +
+  geom_segment(data = segments,
+               aes(x = x, y = y, xend = xend, yend = yend)
+  ) +
+  geom_text(data = labels,
+            aes(x = x, y = y, 
+                label = label, hjust = 0),
+            size = 2
+  ) +
+  coord_flip() +
+  scale_y_reverse(expand = c(0.2, 0)) +
+  ggtitle("Hierarchical classification of USArrests data") +
+  theme_minimal()
+}
+```
+
+```
+Violent Crime Rates by US State
+
+Description
+
+This data set contains statistics, in arrests per 100,000 residents for assault, murder, and rape in each of the 50 US states in 1973. Also given is the percent of the population living in urban areas.
+```
+
+:::
+
+:::
+
+##  {{< fa hand-point-right >}}
+
+Dendrogram and trees show up in several areas.
+
+Classification and Regression trees play an important role in Machine Learning.
+
+`ggdendro` and `dendextend`  may also be used to manipulate regression trees
+
+
+
+
+
+
+##  {{< fa route >}}
+
+- Cutting a dendrogram: getting a flat clustering
+
+- Building a dendrogram: inside `hclust`
+
+- Displaying, reporting dendrograms
+
+
+
+## Cutting a dendrogram: Iris illustration  {.smaller}
+
+
+
+> The famous (Fisher’s or Anderson’s) iris data set gives the measurements in centimeters of the variables sepal length and width and petal length and width, respectively, for 50 flowers from each of 3 species of iris. The species are Iris setosa, versicolor, and virginica.
+
+
+> The Iris flower data set is fun for learning supervised classification algorithms, and is known as a difficult case for unsupervised learning.
+
+> The Setosa species are distinctly different from Versicolor and Virginica (they have lower petal length and width). But Versicolor and Virginica cannot easily be separated based on measurements of their sepal and petal width/length.
+
+
+## 
+
+```{r}
+#| label: iris-hclust-dendro
+#| output-location: column
+iris_num <- iris |>
+  dplyr::select(where(is.numeric))
+
+rownames(iris_num) <- str_c(iris$Species,
+                            1:150, 
+                            sep = "_")
+
+iris_num |>
+  dist() |>                
+  hclust() |>   
+  dendro_data() |>   
+  ggdendrogram(
+    leaf_labels = TRUE,
+    rotate = TRUE) +
+  ggtitle("Dendrogram for Iris") +
+  theme_dendro() # +
+  scale_y_reverse(expand = c(0.2, 0)) 
+```
+
+
+
+##
+
+- `as.matrix(dist(iris[,1:4]))` returns the matrix of pairwise distances
+- Default distance is Euclidean distance
+- What about using `broom::augment`?
+- There is no `augment.hclust` method: `No augment method for objects of class hclust`
+
+```{r}
+#| label: hclust-pipeline
+#| echo: false
+rownames(iris) <- str_c(iris$Species, rownames(iris), sep="_")
+```
+
+
+
+## `hclust` pipeline   {.smaller}
+
+```{r}
+#| label: data-preparation
+#| echo: true
+dendro_iris <- iris |> 
+  select(where(is.numeric)) |>  
+  dist() |> 
+  hclust() |> 
+  dendro_data() 
+```
+
+```{r}
+#| label: dendroplot
+#| echo: true
+#| 
+mydendro <- . %$% {  #<<
+  ggplot() + 
+    geom_segment(
+      data = segments,   #<<
+      aes(
+        x = x, y = y, 
+        xend = xend, 
+        yend = yend)
+  ) +
+  geom_text(
+    data = labels, #<<
+    aes(
+      x = x, y = y, 
+      label = label, hjust = 0),
+    size = 2
+  ) +
+  coord_flip() +
+  scale_y_reverse(expand = c(0.2, 0)) +
+  theme_dendro()  
+}
+```
+
+
+
+##
+
+```{r}
+#| echo: true
+mydendro(dendro_iris)
+```
+
+##  {.smaller}
+
+```{r}
+mydendro_iris <- . %$% {  #<<
+  ggplot() + 
+    geom_segment(
+      data = segments,   #<<
+      aes(
+        x = x, y = y, 
+        xend = xend, 
+        yend = yend)
+  ) +
+  geom_text(
+    data = labels, #<<
+    aes(
+      x = x, y = y, 
+      label = label, 
+      color = couleur,
+      hjust = 0),
+      size = 2
+  ) +
+  coord_flip() +
+  scale_y_reverse(expand = c(0.2, 0)) +
+  theme_dendro()  
+}
+```
+
+## 
+
+```{r}
+#| output-location: column
+# require(viridisLite)
+tmp <- dendro_iris %$% {
+  list(
+    "segments"= segments,
+    "labels"= labels |> 
+        mutate(
+          couleur=map_chr(
+            label, ~ str_match(., '^([\\w]+)_[0-9]+')[1,2]),
+          label= map_chr(
+            label, ~str_match(., '^[\\w]+_([0-9]+)')[1,2]))
+  )
+} 
+
+tmp |>
+  mydendro_iris()
+```
+
+
+
+## Inside ggdendro
+
+
+```{r}
+iris %>% 
+  select(where(is.numeric)) %>% 
+  dist() %>% 
+  hclust("ave") %>% 
+  dendro_data(type = "rectangle") %$% {
+  list("segments"= segments,
+       "labels"= labels %>% 
+         mutate(
+          couleur=map_chr(
+            label, 
+            ~ str_match(., '^([\\w]+)_[0-9]+')[1,2]),
+          label= map_chr(
+            label, 
+            ~str_match(., '^[\\w]+_([0-9]+)')[1,2]))
+      )
+} %>% 
+  mydendro_iris()
+```
+
+##
+
+What is an object of class `dendro` made of?
+
+It a list of four elements:
+
+- `segments`
+- `labels`
+- `leaf_labels`
+- `class`
+
+Element `segments` is a data frame with four columns. Each row represent a segment that is part of a graphical representation of the hierarchy. There are horizontal and vertical segments 
+
+Element `labels` is used to label the tree leafs. 
+
+
+
+##
+
+```{r}
+# from [ggdendro vignette](http://andrie.github.io/ggdendro/)
+# with the exposing pipe %$% from magrittr
+#| output-location: column
+USArrests %>% 
+  dist() %>% 
+  hclust("ave") %>% 
+  dendro_data(
+    type = "rectangle") %>% 
+  mydendro()
+```
+
+
+
+
+## Cutting a dendrogram: {{< fa syringe >}} Iris illustration (continued)
+
+
+
+```{r}
+#| label: iris-hclust-1
+#| echo: true
+p <- iris %>%
+  ggplot() +
+  aes(x=Petal.Length, y=Petal.Width)
+
+p +
+  geom_point(
+    aes(
+      shape=Species, 
+      colour=Species)
+  ) +
+# labs(shape= "Species") +
+  ggtitle(
+    label= "Iris data",
+    subtitle = "Species in Petal plane"
+  )
+```
+
+
+
+## 
+
+Does the flat clustering obtained by cutting the dendrogram at some height
+reflect the partition into species?
+
+
+
+
+
+## Cutting a dendrogram:  Iris illustration (continued)
+
+
+
+```{r}
+#| label: iris-hclust-2
+#| 
+iris_hclust <- iris_num %>%  dist() %>%  hclust()
+iris_3 <- cutree(iris_hclust, 3)  #<<
+p +
+  geom_point(aes(shape=Species,
+                 colour=factor(iris_3))) + #<<
+  labs(colour= "Clusters") +
+  ggtitle("Iris data",
+          "Hierarchical clustering, 3 classes")
+```
+
+
+## Cutting a dendrogram:  Iris illustration (continued)
+
+
+
+
+```{r}
+#| label: iris-hclust-3
+
+p +
+  geom_point(
+    aes(
+      shape=Species,
+      colour=factor(iris_3))
+  ) +
+  labs(colour= "Clusters") +
+  labs(shape="Species") +
+  ggtitle(
+    "Iris data",
+    "Hierarchical clustering and Species")
+```
+
+## Cutting a dendrogram:  Iris illustration (continued)
+
+
+```{r}
+#| label: iris-hclust-4
+{{iris_2 <- cutree(iris_hclust, 2)}}
+
+p +
+  geom_point(aes(shape=Species,
+                 colour=factor(iris_2))) +
+  labs(colour= "Clusters") +
+  labs(shape="Species") +
+  ggtitle("Iris data",
+          "Clustering in 2 classes and Species")
+```
+
+
+## Cutting a dendrogram:  Iris illustration (continued)
+
+```{r}
+#| label: iris-hclust-5
+{{iris_4 <- cutree(iris_hclust, 4)}}
+
+p +
+  geom_point(aes(shape=Species,
+                 colour=factor(iris_4))) +
+  labs(colour= "Clusters") +
+  labs(shape="Species") +
+  ggtitle("Iris data",
+          "Clustering in 4 classes and Species")
+```
+
+##
+
+```{r}
+sample_iris <-
+  rownames_to_column(iris, var = "num") %>%
+  group_by(Species) %>%
+  sample_n(10)
+```
+
+
+
+## Cutting a dendrogram:  better Iris illustration (continued)
+
+
+The [`dendextend`](https://talgalili.github.io/dendextend/articles/dendextend.html) package offers a set of functions for extending _dendrogram_ objects in `r fontawesome::fa("r-project")`, letting you
+
+- visualize and
+- compare trees of hierarchical clusterings,
+
+Features:
+
+- Adjust a tree’s graphical parameters - the color, size, type, etc, of its branches, nodes and labels
+- Visually and statistically compare different dendrograms to one another
+
+
+##
+
+```{r}
+require(dendextend)
+require(colorspace)
+species_col <- rev(rainbow_hcl(3))[as.numeric(iris$Species)]
+dend <- as.dendrogram(iris_hclust)  #<<
+
+# order it the closest we can to the order of the observations:
+dend <- rotate(dend, 1:150)
+
+# Color the branches based on the clusters:
+dend <- color_branches(dend, k=3) #, groupLabels=iris_species)
+
+# Manually match the labels, as much as possible, to the real classification of the flowers:
+labels_colors(dend) <-
+   rainbow_hcl(3)[sort_levels_values(
+      as.numeric(iris[,5])[order.dendrogram(dend)]
+   )]
+
+```
+
+
+
+
+
+
+```{r}
+#| label: hang-iris
+#| 
+# We hang the dendrogram a bit:
+dend <- hang.dendrogram(dend, hang_height=0.1)  #<<
+# reduce the size of the labels:
+dend <- assign_values_to_leaves_nodePar(dend, 0.5, "lab.cex") #<<
+# dend <- set(dend, "labels_cex", 0.5)
+# And plot:
+par(mar = c(3,3,3,7))
+plot(dend,
+     main = "Clustered Iris data set
+     (the labels give the true flower species)",
+     horiz =  TRUE,  nodePar = list(cex = .007))
+```
+
+
+::: {.notes}
+
+- [dendextend](https://talgalili.github.io/dendextend/articles/dendextend.html)
+
+- [A dendro gallery](https://www.r-graph-gallery.com/340-custom-your-dendrogram-with-dendextend.html)
+
+- class of `dend`
+
+:::
+
+
+# Inside `hclust`   {background-color="#1c191c"}
+
+
+## About class `hclust`
+
+Results from function `hclust()` are objects of class `hclust` :
+
+`iris_hclust` is an object of class `r class(iris_hclust)`
+
+Function `cutree()` returns a flat clustering of the dataset
+
+
+::: {.notes}
+
+What does `height` stand for?
+
+What does `merge` stand for?
+
+What does `order` stand for?
+
+How different are the different `method`?
+
+:::
+
+## Hierarchical clustering of `USArrests`
+
+
+```{r}
+data("USArrests")
+USArrests %>% glimpse()
+```
+
+
+```{r}
+#| label: dendro-USArrests
+USArrests %>% 
+  select(where(is.numeric)) %>% 
+  scale() %>% 
+  dist() %>% 
+  hclust("ave") %>% 
+  dendro_data(type = "rectangle") %>% 
+  mydendro()
+```
+
+
+## About dendrograms (output `dendro_data()`)
+
+An object of class `dendro` is a list of 4 objects:
+
+  - `segments`
+  - `labels`
+  - `leaf_labels`
+  - `class`
+
+```{r}
+iris_dendro <- dendro_data(iris_hclust)
+```
+
+
+
+## Questions
+
+- How to build the dendrogram?
+
+- How to choose the cut?
+
+
+
+
+## Bird-eye view at hierarchical agglomerative clustering methods
+
+### All [hierarchical agglomerative clustering methods (HACMs)](https://en.wikipedia.org/wiki/Hierarchical_clustering) can be described by the following general algorithm.
+
+1. At each stage distances between clusters are recomputed by the _Lance-Williams dissimilarity update formula_ according to the particular clustering method being used.
+
+1. Identify the 2 closest _points_ and combine them into a cluster (treating existing clusters as points too)
+
+1. If more than one cluster remains, return to step 1.
+
+
+
+
+
+##  Greed is good!
+
+
+- Hierarchical agglomerative clustering methods are examples of _greedy algorithms_
+
+- Greedy algorithms sometimes compute _optimal solutions_
+
+  + Huffmann coding (Information Theory)
+
+  + Minimum spanning tree (Graph algorithms)
+
+- Greedy algorithms sometimes compute _sub-optimal solutions_
+
+  + Set cover (NP-hard problem)
+
+  + ...
+
+- Efficient greedy algorithms rely on ad hoc data structures
+
+  + Priority queues
+
+  + Union-Find
+
+
+
+
+
+
+## {{< fa binoculars >}} Algorithm (detailed)
+
+- Start with $(\mathcal{C}_{i}^{(0)})= (\{ \vec{X}_i \})$ the collection
+  of all singletons.
+
+- At step $s$, we have $n-s$ clusters $(\mathcal{C}_{i}^{(s)})$:
+
+  -   Find the two most similar clusters according to a criterion
+        $\Delta$: $$(i,i') = \operatorname{argmin}_{(j,j')} \Delta(\mathcal{C}_{j}^{(s)},\mathcal{C}_{j'}^{(s)})$$
+
+  -   Merge $\mathcal{C}_{i}^{(s)}$ and $\mathcal{C}_{i'}^{(s)}$ into
+        $\mathcal{C}_{i}^{(s+1)}$
+
+  -   Keep the $n-s-2$ other clusters
+        $\mathcal{C}_{i''}^{(s+1)} = \mathcal{C}_{i''}^{(s)}$
+
+-   Repeat until there is only one cluster left
+
+
+
+## Analysis
+
+-   Complexity: $O(n^3)$ in general.
+
+-   Can be reduced to $O(n^2)$ (sometimes to $O(n \log n)$)
+
+    -   if the number of possible mergers for a given cluster is  bounded.
+
+    -   for the most classical distances by maintaining a nearest
+        neighbors list.
+
+
+
+
+## Merging criterion based on the distance between points
+
+### Minimum linkage:
+$$\Delta(\mathcal{C}_i, \mathcal{C}_j) =\min_{\vec{X}_i \in \mathcal{C}_i} \min_{\vec{X}_j \in    \mathcal{C}_j} d(\vec{X}_i, \vec{X}_j)$$
+
+### Maximum linkage:
+$$\Delta(\mathcal{C}_i, \mathcal{C}_j) = \max_{\vec{X}_i \in \mathcal{C}_i} \max_{\vec{X}_j \in    \mathcal{C}_j} d(\vec{X}_i, \vec{X}_j)$$
+
+### Average linkage:
+$$\Delta(\mathcal{C}_i, \mathcal{C}_j) =\frac{1}{|\mathcal{C}_i||\mathcal{C}_j|} \sum_{\vec{X}_i \in    \mathcal{C}_i}\sum_{\vec{X}_j \in \mathcal{C}_j} d(\vec{X}_i, \vec{X}_j)$$
+
+
+
+##  Ward's criterion : minimum variance/inertia criterion
+
+
+$\Delta(\mathcal{C}_i, \mathcal{C}_j) = \sum_{\vec{X}_i \in \mathcal{C}_i} \left( d^2(\vec{X}_i, \mu_{\mathcal{C}_i \cup \mathcal{C}_j} ) - d^2(\vec{X}_i, \mu_{\mathcal{C}_i}) \right) +$
+
+$\qquad\qquad \qquad \sum_{\vec{X}_j \in \mathcal{C}_j} \left( d^2(\vec{X}_j, \mu_{\mathcal{C}_i \cup \mathcal{C}_j} ) - d^2(\vec{X}_j, \mu_{\mathcal{C}_j}) \right)$
+
+
+
+### If $d$ is the euclidean distance
+
+
+$$\Delta(\mathcal{C}_i, \mathcal{C}_j) = \frac{ |\mathcal{C}_i||\mathcal{C}_j|}{|\mathcal{C}_i|+ |\mathcal{C}_j|} d^2(\mu_{\mathcal{C}_i}, \mu_{\mathcal{C}_j})$$
+
+
+
+
+## Lance-Williams update formulae
+
+Suppose that clusters $C_{i}$ and $C_{j}$ were next to be merged
+
+At this point, all of the current pairwise cluster _distances_ are known
+
+The recursive update formula gives the updated cluster _distances_ following the pending merge of clusters $C_{i}$ and $C_{j}$
+
+Let
+
+- $d_{ij}, d_{ik}$, and $d_{jk}$ be shortands for the pairwise _distances_ between clusters $C_{i}, C_{j}$ and $C_{k}$
+
+- $d_{{(ij)k}}$ be shortand  for the _distance_ between the new cluster $C_{i}\cup C_{j}$ and $C_{k}$ ( $k\not\in \{i,j\}$ )
+
+
+
+## Lance-Williams update formulae (continued)
+
+An algorithm belongs to the _Lance-Williams family_ if the updated cluster _distance_ $d_{{(ij)k}}$ can be computed recursively by
+
+$$d_{(ij)k} = \alpha _{i}d_{ik}+ \alpha _{j}d_{jk}+ \beta d_{ij}+ \gamma |d_{ik}-d_{jk}|$$
+
+where $\alpha_{i},\alpha _{j},\beta$ , and $\gamma$  are parameters, which may depend on cluster sizes, that together with the cluster _distance_ function $d_{ij}$ determine the clustering algorithm.
+
+::: {.notes}
+
+Clustering algorithms such as 
+
+- single linkage, 
+- complete linkage, and 
+- group average 
+
+method have a recursive formula of the above type
+
+
+:::
+
+## Lance-Williams update formula for Ward's criterion
+
+$$\begin{array}{rl}d\left(C_i \cup C_j, C_k\right) & = \frac{n_i+n_k}{n_i+n_j+n_k}d\left(C_i, C_k\right)  +\frac{n_j+n_k}{n_i+n_j+n_k}d\left(C_j, C_k\right) \\ & \phantom{==}- \frac{n_k}{n_i+n_j+n_k} d\left(C_i, C_j\right)\end{array}$$
+
+$$\alpha_i = \frac{n_i+n_k}{n_i+n_j+n_k} \qquad \alpha_j = \frac{n_j+n_k}{n_i+n_j+n_k}\qquad \beta = \frac{- n_k}{n_i+n_j+n_k}$$
+
+
+
+## An unfair quotation
+
+> Ward's minimum variance criterion minimizes the total within-cluster variance .fr[Wikipedia]
+
+
+- Is that correct?
+
+- If corrected, what does it mean?
+
+
+::: {.notes}
+
+If we understand the statement as:
+
+> for any $k$, the flat clustering obtained by cutting the dendrogram so as to obtain a $k$-clusters partition  minimizes the total within-cluster variance/inertia  amongst all $k$-clusterings
+
+then, the statement is not proved. If it were proved, it would  imply $\mathsf{P}=\mathsf{NP}$
+
+The total within-cluster variance/inertia is the objective function in the $k$-means problem.
+
+The statement is misleading
+
+:::
+
+
+## What happens in Ward's method?
+
+> At each step find the pair of clusters that leads to minimum increase in total within-cluster variance after merging .fr[Wikipedia]
+
+> This increase is a weighted squared distance between cluster centers .fr[Wikipedia]
+
+> At the initial step, all clusters are singletons (clusters containing a single point). To apply a recursive algorithm under this objective function, the initial distance between individual objects must be (proportional to) squared Euclidean distance.
+
+
+
+
+## Views on Inertia:
+
+$$I   = \frac{1}{n} \sum_{i=1}^n \|\vec{X}_i - \vec{m} \|^2$$
+
+where $\vec{m} = \sum_{i=1}^n \frac{1}{n}\vec{X}_i$
+
+$$I = \frac{1}{2n^2} \sum_{i,j} \|\vec{X}_i - \vec{X}_j\|^2$$
+
+
+Twice the  mean squared distance to the mean equals the  mean squared distance between sample points
+
+::: {.notes}
+
+Recall that for a real random variable $Z$ with mean $\mu$
+
+$$\operatorname{var}(Z) = \mathbb{E}(Z -m)^2 = \inf_a \mathbb{E}(Z -a)^2$$
+
+and
+
+$$\operatorname{var}(Z) = \frac{1}{2} \mathbb{E}(Z -Z')^2$$
+
+where $Z'$ is an independent copy of $Z$
+
+The different formulae for inertia is just mirroring the different views at variance
+
+The inertia is the trace of an empirical covariance matrix.
+
+:::
+
+
+
+## Decompositions of inertia (Huyghens formula)
+
+- Sample  $x_1,\ldots, x_{n+m}$ with mean $\bar{X}_{n+m}$  and  variance $V$
+
+- Partition  $\{1,\ldots,n+m\} = A \cup B$  with   $|A|=n, |B|=m$, $A \cap B =\emptyset$
+
+- Let $\bar{X}_n = \frac{1}{n}\sum_{i \in A} X_i$ and $\bar{X}_m=\frac{1}{m}\sum_{i \in B}X_i$
+$$\bar{X}_{n+m} =  \frac{n}{n+m} \bar{X}_{n}  +\frac{m}{n+m} \bar{X}_{m}$$
+
+- Let $V_A$  be the variance of $(x_i)_{i\in A}$, $V_B$ be the  variance of $(x_i)_{i\in B}$
+
+
+
+## Decompositions of inertia (Huyghens formula)
+
+- Let $V_{\text{between}}$ be the  variance of a ghost sample with   $n$ copies of $\bar{X}_n$ and $m$ copies of $\bar{X}_m$
+$$V_{\text{between}} =  \frac{n}{n+m} (\bar{X}_n -\bar{X}_{n+m})^2 + \frac{m}{n+m} (\bar{X}_m -\bar{X}_{n+m})^2$$
+
+- Let $V_{\text{within}}$ be the weighted mean of variances within classes $A$ and $B$
+$$V_{\text{within}}  = \frac{n}{n+m}  V_A + \frac{m}{n+m} V_B$$
+
+
+
+## Decompositions of inertia
+
+::: {.callout-important}
+
+### Proposition:  Huyghens formula I
+
+$$V = V_{\text{within}} +  V_{\text{between}}$$
+
+:::
+
+
+## Huyghens formula can be extended to any number of classes
+
+::: {.callout-important}
+
+### Proposition: Huyghens (II)
+
+- Sample  $\vec{x}_1, \ldots,\vec{x}_n$  from $\mathbb{R}^p$ with mean $\bar{X}_n$, inertia  $I$.
+
+- Let $A_1, A_2\ldots, A_k$ be a partition of
+$\{1,\ldots,n\}$.
+
+- Let $I_\ell$ (resp. $\bar{X}^\ell$) be the inertia (resp. the mean) of sub-sample $\vec{x}_i, i\in A_\ell$
+
+- Let $I_{\text{between}}$ be the inertia of the ghost sample, formed by  $|A_1|$ copies of $\bar{X}^1$,  $|A_2|$ copies of $\bar{X}^2$,  ...
+ $|A_k|$ copies of $\bar{X}^k$
+
+- Let $I_{\text{within}} =  \sum_{\ell=1}^k \frac{|A_\ell|}{n}  I_\ell$
+
+$$I =   I_{\text{within}} +  I_{\text{between}}$$
+
+:::
+
+
+
+
+# Comparing dendrograms  {background-color="#1c191c"}
+
+
+## Cophenetic disimilarity
+
+Given a dendrogram, the _cophenetic_ disimilarity between two sample points $x, x'$ is
+the intergroup disimilarity at which observations $x$ and $x'$ are first joined.
+
+::: {.callout-important}
+
+### Proposition
+
+A cophenetic disimilarity has the _ultrametric_ property
+
+:::
+
+
+::: {.aside}
+
+All triangles are isoceles and the unequal length should be no longer than the length of the two equal sides
+
+:::
+
+
+
+## Cophenetic correlation coefficient
+
+
+The cophenetic correlation coefficient measures  how faithfully a dendrogram preserves the pairwise distances between the original unmodeled data points 
+
+::: {.aside}
+[wikipedia](https://en.wikipedia.org/wiki/Cophenetic_correlation)]
+
+:::
+
+## Computing cophenetic correlation coefficient
+
+In  {{< fa brands r-project >}} use the `dendextend` package
+
+
+```{r}
+dd <- select(iris, where(is.numeric)) %>% dist
+
+methods <- c("single", "complete", "average", "mcquitty",
+        "ward.D", "centroid", "median", "ward.D2")
+
+cor_coph <- purrr::map_dbl(methods,
+           ~ cor_cophenetic(hclust(dd, method = .), dd))  #<<
+
+names(cor_coph) <- methods
+
+as_tibble_row(cor_coph ) %>% knitr::kable(digits = 2)
+```
+
+##
+
+
+```{r}
+# data("iris")
+d_iris <- select(iris, where(is.numeric)) %>%  dist() # method="man" # is a bit better
+hc_iris <- hclust(d_iris, method = "complete")
+iris_species <- rev(levels(iris[,5]))
+
+library(dendextend)
+library(colorspace)
+dend <- as.dendrogram(hc_iris)
+# order it the closest we can to the order of the observations:
+dend <- rotate(dend, 1:150)
+
+# Color the branches based on the clusters:
+dend <- color_branches(dend, k=3) #, groupLabels=iris_species)
+
+# Manually match the labels, as much as possible, to the real classification of the flowers:
+labels_colors(dend) <-
+   rainbow_hcl(3)[sort_levels_values(
+      as.numeric(iris[,5])[order.dendrogram(dend)]
+   )]
+
+# We shall add the flower type to the labels:
+labels(dend) <- paste(as.character(iris[,5])[order.dendrogram(dend)],
+                           "(",labels(dend),")", 
+                           sep = "")
+# We hang the dendrogram a bit:
+dend <- hang.dendrogram(dend,hang_height=0.1)
+# reduce the size of the labels:
+# dend <- assign_values_to_leaves_nodePar(dend, 0.5, "lab.cex")
+dend <- set(dend, "labels_cex", 0.5)
+# And plot:
+par(mar = c(3,3,3,7))
+plot(dend, 
+     main = "Clustered Iris data set
+     (the labels give the true flower species)", 
+     horiz =  TRUE,  nodePar = list(cex = .007))
+legend("topleft", legend = iris_species, fill = rainbow_hcl(3))
+```
+
+
+
+
+## How to apply general algorithm?
+
+- Lance-Williams dissimilarity update formula calculates dissimilarities between a new cluster and existing points, based on the dissimilarities prior to forming the new cluster
+
+- This formula has 3 parameters
+
+- Each HACM is characterized by its own set of Lance-Williams parameters
+
+
+
+## Implementations of the general algorithm
+
+
+### Stored matrix approach
+
+Use matrix, and then apply Lance-Williams to recalculate dissimilarities between cluster centers. Storage  $O(N^2)$ and time at least $O(N^2)$, but is $\Theta(N^3)$ if matrix is scanned linearly
+
+### Stored data approach
+
+$O(N)$ space for data but recompute pairwise dissimilarities, needs $\Theta(N^3)$ time
+
+
+### Sorted matrix approach
+
+$O(N^2)$ to calculate dissimilarity matrix, $O(N^2 \log N)$ to sort it, $O(N^2)$ to construct hierarchy, but one need not store the data set, and the matrix can be processed linearly, which reduces disk accesses
+
+
+
+## Agglomerative Clustering Heuristic
+
+
+-   Start with very small clusters (a sample point by cluster?)
+
+-   Merge iteratively the most similar clusters according to some *greedy* criterion $\Delta$.
+
+-   Generates a _hierarchy of clusterings_ instead of a single one.
+
+-   Need to select the number of cluster afterwards.
+
+-   Several choice for the merging criterion
+
+-   Examples:
+
+    -   _Minimum Linkage_: merge the closest cluster in term of the usual
+        distance
+
+    -   _Ward's criterion_: merge the two clusters yielding the less inner
+        inertia loss (minimum variance criterion)
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Packages
+
+- `r fontawesome::fa("r-project")`
+  + [`ggdendro`](https://cran.r-project.org/web/packages/ggdendro/vignettes/ggdendro.html)
+  + [`dendextend`](https://cran.r-project.org/web/packages/dendextend/vignettes/dendextend.html)
+  + [`dendroextras`](https://cran.r-project.org/web/packages/dendroextras/index.html)
+
+- `r fontawesome::fa("python")`
+  + [`scipy`](https://docs.scipy.org/doc/scipy/reference/cluster.hierarchy.html)
+  + [`scikit-learn`](https://scikit-learn.org/stable/modules/clustering.html#hierarchical-clustering)
+
+# The End   {background-color="#1c191c"}
