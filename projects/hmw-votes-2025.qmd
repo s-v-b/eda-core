@@ -1,0 +1,151 @@
+---
+title: "Hmw III: SVD methods and Elections Data"
+date: "2025-05-29"
+engine: knitr
+
+execute:
+  echo: true
+  eval: false
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-votes-2025.html
+  pdf:
+    output-file: hmw-votes-2025.pdf
+
+draft: false
+prefer-html: true
+---
+
+::: {.callout-important}
+
+- Due : May 29 2025
+- Work in pairs
+- {{< fa brands github >}} Deliver your work through a github  repository
+- {{< fa desktop >}} Present your work (15 minutes) on 2025-05-30 
+
+:::
+
+
+This homework is about  
+
+1. Using Matrix Factorization methods in Data analysis
+2. Investigating  voting patterns in Paris 
+
+```{r useful-pkg, include=FALSE}
+#| message: FALSE
+#| warning: FALSE
+#| eval: true
+
+stopifnot(
+  require(tidyverse),
+  require(glue),
+  require(patchwork),
+  require(gt),
+  require(ggforce),
+  require(fs)
+)
+```
+
+I\. **Voting Data**
+
+Voting data  per polling station can be obtained  from a variety of websites. 
+
+
+- [An example](https://opendata.paris.fr/explore/dataset/elections-legislatives-2024-2emetour/information/)
+- [Another example](https://data.opendatasoft.com/api/explore/v2.1/catalog/datasets/elections-france-presidentielles-2022-1er-tour-par-bureau-de-vote@public/exports/parquet?lang=en&refine=dep_name%3A%22Paris%22&timezone=Europe%2FParis)
+- [Yet another one](https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2024/exports/parquet?lang=en&timezone=Europe%2FBerlin)
+- [Opendatasoft API](https://help.opendatasoft.com/apis/ods-explore-v2/explore_v2.1.html)
+- [https://opendata.paris.fr](https://opendata.paris.fr)
+- [https://data.smartidf.services/pages/data/](https://data.smartidf.services/pages/data/)
+- [https://data.opendatasoft.com](https://data.opendatasoft.com/explore/?disjunctive.language&disjunctive.source_domain_title&disjunctive.theme&disjunctive.semantic.classes&disjunctive.semantic.properties&sort=explore.popularity_score)
+
+::: {.callout-note}
+
+Many datasets are available in several formats. When possible, use `parquet`. `parquet` files can be uploaded using package `arrow`. 
+
+:::
+
+{{< pagebreak >}}
+
+Data concerning polling stations can also be gathered from various sources.
+
+- [https://github.com/datagouv/bureau-vote](https://github.com/datagouv/bureau-vote)
+- [https://opendata.paris.fr](https://opendata.paris.fr)
+  
+You first task will be to design an *extraction pipeline* to obtain the voting data you will analyse.
+You will gather data corresponding to different types of elections (Municipales, Régionales, Législatives, Européennes, Présidentielles) that took place since Year 2000.
+
+
+
+```{r}
+#| echo: false
+#| eval: true
+scrutins <-  dplyr::bind_rows(
+  tibble::tibble(title='European P', rounds=1, year=seq(2004, 2024, 5)),
+  tibble::tibble(title='Parliament', rounds=2, year=c(seq(2002, 2022, 5),2024)),
+  tibble::tibble(title='President', rounds=2, year=seq(2002, 2022, 5)),
+  tibble::tibble(title='Local', rounds=2, year=c(2001, seq(2008, 2020, 6))),
+  tibble::tibble(title='Régionales', rounds=2, year=c(2004, 2010, 2015, 2021))
+  )
+
+scrutins |> 
+  dplyr::slice_sample(n=5) |> 
+  dplyr::arrange(year) |> 
+  gt::gt()
+```
+
+II\. **Data cleaning**
+
+Some data cleaning may be necessary, for example
+
+- Some parties changed their names during the last 25 years. Defining a mapping can facilitate the comparison of results from different elections
+- Check that the names of `bulletins nuls`, `bulletins blancs`, ... are consistent across the different 
+datasets. 
+
+::: {.callout-note}
+
+Design  a cleaning pipeline. Save the cleaned data.
+
+:::
+
+
+III\. **Applying Matrix Factorization Methods (SVD)**
+
+For one election round, the outcome is summarized by a `tibble` where rows (individuals) are 
+polling stations and variables/columns are the number of votes obtained by the different condidates/parties. 
+
+Perform PCA on different elections. Visualize and describe the result (attention, this is data analysis, not political science). 
+
+You may also perform CCA to compare different elections. 
+
+Feel free to combine different methods.  
+
+
+
+IV\. **Clustering**
+
+Perform clustering on the outcomes of the Principal Component Analyses.  
+  
+## References
+
+- [Advanced R Programming](https://adv-r.hadley.nz)
+  - [Functional programming](https://adv-r.hadley.nz/functionals.html) 
+  - [S3](https://adv-r.hadley.nz/s3.html)
+  - [Meta programming](https://adv-r.hadley.nz/metaprogramming.html)
+- [Packages](https://r-pkgs.org)
+- [Programming with/for `ggplot2`](https://ggplot2-book.org)
+- [Programming with `dplyr`](https://dplyr.tidyverse.org/articles/programming.html)
+- [`tidyeval` helpers](https://ggplot2.tidyverse.org/reference/tidyeval.html)
+- [Cheatsheets](https://posit.co/resources/cheatsheets/)
+
+
+{{< pagebreak >}}
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+| Documentation/Report | `r scales::label_percent()(9/20)` | English/French {{<  fa pen-fancy >}} |
+| Presentation | `r scales::label_percent()(8/20)` |  |
+| Data gathering/cleaning pipelines | `r scales::label_percent()(3/20)` |  |
+: {{<  fa graduation-cap >}} Grading criteria 
