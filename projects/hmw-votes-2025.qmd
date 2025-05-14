@@ -23,7 +23,7 @@ prefer-html: true
 - Due : May 29 2025
 - Work in pairs
 - {{< fa brands github >}} Deliver your work through a github  repository
-- {{< fa desktop >}} Present your work (15 minutes) on 2025-05-30 
+- {{< fa desktop >}} Present your work (15 minutes) on *2025-06-03* 
 
 :::
 
