@@ -5,6 +5,7 @@ execute:
   echo: true
   eval: true
   collapse: true
+draft: true
 
 format:
   html:

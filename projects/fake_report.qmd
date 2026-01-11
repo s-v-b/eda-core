@@ -3,6 +3,7 @@ title: "LAB: Fake report"
 format:
   html:
     output-file: fake-report.html
+draft: true
 
 execute: 
   eval: true

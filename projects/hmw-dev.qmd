@@ -1,7 +1,7 @@
 ---
-title: "Package Development"
+title: "Hmw II: Regression, Package Development"
+date: "2025-04-16"
 engine: knitr
-date: "`r Sys.time()`"
 
 execute:
   echo: true
@@ -14,20 +14,28 @@ format:
   pdf:
     output-file: hmw-dev-2025.pdf
 
-draft: true
+draft: false
 standalone: true
 prefer-html: true
 ---
 
 
 
+::: {.callout-important}
+
+- Due : April 16, 2025
+- Work in pairs
+- Deliver your work as a `qmd` file through a github {{< fa brands github >}} repository
+- Use the `quarto` package for reproducible research
+- The report should be rendered at least in HTML format, and possibly also in PDF format
+
+:::
 
 
 ### {{< fa map >}} Objectives
 
-
 This homework is concerned with developping methods 
-for objects produced by factorial methods like Correspondence Analysis, Multiple Correspondence Analysis, Canonical Correlation Analysis, ...  (`R`). 
+for objects produced by  functions  like `gpava` from `isotone` (`R`). 
 
 ```{r useful-pkg, include=FALSE}
 #| message: FALSE
@@ -38,7 +46,7 @@ stopifnot(
   require(tidyverse),
   require(glue),
   require(patchwork),
-  require(DT),
+  require(gt),
   require(ggforce)
 )
 ```
@@ -48,13 +56,12 @@ stopifnot(
 The `broom` package offers `S3` generic functions for 
 building dataframes from the output of a variety of statistical techniques (for example `lm`, `prcomp`, or `kmeans`): `augment`, `tidy`, and `glance`.
 
-The first goal of this homework is to  design and code methods for generic functions `augment`, `tidy`, and `glance` for classes `CA`, `MCA`, `CCA`.
+The first goal of this homework is to  design and code methods for generic functions `augment`, `tidy`, and `glance` for classes like `gpava`. 
 
-You may use classes `CA`, `MCA`, and `CCA` from `FactoMineR` or design your own classes. 
 
 ### Programming with `dplyr` and `ggplot2`
 
-The second goal of this homework is to design and code functions that take as input the output of `augment`, `tidy`, and `glance`  (possibly simultaneously) to build `ggplot` objects corresponding to the plots associated with  `CA`, `MCA`, and `CCA` (screeplot, row plot, column plot, and symmetric plot).
+The second goal of this homework is to design and code functions that take as input the output of `augment`, `tidy`, and `glance`  (possibly simultaneously) to build `ggplot` objects corresponding to the plots associated with  `gpava`.
 
 ::: {.callout-note}
 
@@ -63,7 +70,7 @@ have a look at [automatic plotting](https://ggplot2.tidyverse.org/reference/auto
 
 :::
 
-The third goal of this homework is to design and code methods for generic function `autoplot()` for classes `CA`, `MCA`, `CCA`.
+The third goal of this homework is to design and code methods for generic function `autoplot()` for classes 
 
 ::: {.callout-tip}
 
@@ -91,7 +98,7 @@ Follow the package devlopment guidelines in [R Packages (2e)](https://r-pkgs.org
 - [Programming with/for `ggplot2`](https://ggplot2-book.org)
 - [Cheatsheets](https://posit.co/resources/cheatsheets/)
 - [Packages](https://r-pkgs.org)
-
+- [`isotone`]()
 
 
 

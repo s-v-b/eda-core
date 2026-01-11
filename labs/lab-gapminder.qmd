@@ -1242,9 +1242,11 @@ q <- filter(gapminder, FALSE) |>
 #| eval: !expr knitr::is_html_output()
 
 
-(p %+% gapminder +
- facet_null() +
- aes(frame=year)) |>
+(
+  (p %+% gapminder) +
+  facet_null() +
+  aes(frame=year)
+) |>
  plotly::ggplotly(height = 500, width=750)
 
 ```

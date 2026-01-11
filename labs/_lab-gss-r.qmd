@@ -4,8 +4,8 @@ draft: true
 
 execute:
   echo: true
-  eval: true
-  collapse: true
+  eval: false
+  collapse: false
 
 format:
   html:

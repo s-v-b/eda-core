@@ -43,6 +43,8 @@ We  will explore a (small) subset of the [GSS dataset]()
 ## Download the data 
 
 ```{r}
+#| eval: true
+#| 
 download_data <-  function(fname,
                            baseurl = 'https://stephane-v-boucheron.fr/data',
                            datapath = "./DATA") {
@@ -71,6 +73,7 @@ download_data <-  function(fname,
 ```{.r}
 download_data(fname="sub-data.txt")
 ```
+
 ```{.r}
 download_data(fname="sub-cdbk.txt")
 ```
@@ -88,7 +91,16 @@ download.file(url=paste(baseurl, fname, sep="/"),
 
 There is no need to (always) reinvent the wheel!
 
+Package `fs` offers a modern API for file handling tasks.
+
+```{.r}
+
+```
+
 :::
+
+
+
 
 ## Load the data in your session 
 
@@ -142,7 +154,7 @@ df |>
 
 # NULL values 
 
-In the dataframe, NULL are encoded in several ways. From the metadata, we learn 
+In the dataframe, NULL are encoded in several ways. From the *metadata*, we learn 
 
 ```
            VALUE  LABEL
@@ -182,7 +194,7 @@ na_patterns
 ### Regular expressions 
 
 Regular expressions are a Swiss army knife when dealing with text data. Get acquainted with them. 
-It is useful whenver you work data or edit a file
+It is useful whenever you work data or edit a file
 
 See [Regular expressions in R](https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html)
 
@@ -252,12 +264,13 @@ df_redux |>
 ```
 
 There are still many columns and some of them do not look very exciting.
+
 :::
 
 :::::
 
 
-## Howm many missing values per column ?
+## Howm many missing values per column?
 
 
 ::::: {.content-visible when-profile="solution"}  

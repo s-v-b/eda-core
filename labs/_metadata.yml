@@ -1,6 +1,6 @@
 format:
   html:
-    highlight-style: zenburn
+    highlight-style: arrow
     code-fold: true
     code-link: true
     code-annotations: hover

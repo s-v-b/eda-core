@@ -1,6 +1,7 @@
 ---
 title: "Life Tables"
 date: "`r Sys.time()`"
+draft: true
 
 execute:
   echo: true

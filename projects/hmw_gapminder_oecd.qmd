@@ -2,6 +2,7 @@
 title: "Hmw I : Tables and visualization"
 date: "2025-01-13"
 
+draft: true
 engine: knitr
 ---
 

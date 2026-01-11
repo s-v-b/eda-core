@@ -2,6 +2,7 @@
 title: "Hmw III: SVD methods and Elections Data"
 date: "2025-05-29"
 engine: knitr
+draft: true 
 
 execute:
   echo: true
