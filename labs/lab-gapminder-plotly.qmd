@@ -1,0 +1,56 @@
+---
+title: "Data visualization  with plotly"
+categories: [Visualization, Rosling, gapminder, ggplot2, plotly, Grammar of Graphics]
+date: "`r Sys.time()`"
+
+format:
+  html:
+    output-file: lab-gapminder-plotly.html
+  pdf:
+    include-in-header: 
+      - file: macros.tex
+    output-file: lab-gapminder-plotly.pdf
+
+execute: 
+  eval: true
+  echo: true
+  collapse: true
+
+
+
+---
+
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| label: load-gapminder
+#| echo: true
+#| eval: true
+
+library(gapminder)
+library(plotly)
+library(ggplot2)
+```
+
+```{r}
+#| label: animated-plot
+#| echo: true
+#| eval: true
+
+# Create animated plotly visualization
+# X-axis: gdpPercap, Y-axis: lifeExp, Frame: year
+(gapminder |>
+  ggplot() +
+  aes(x = gdpPercap, y = lifeExp, frame = year) +
+  geom_point(alpha = 0.6) +
+  scale_x_log10() +
+  labs(
+    x = "GDP per Capita",
+    y = "Life Expectancy",
+    title = "Gapminder: Life Expectancy vs GDP per Capita (Animated)"
+  )) |>
+  ggplotly(height = 500, width = 750)
+```
+
+
