@@ -5,13 +5,15 @@ categories: [Tables, tibbles, dplyr, SQL, Relational Algebra, nycflights13]
 execute:
   echo: true
   eval: true
-  collapse: true
+  collapse: false
 
 format:
   html:
     output-file: lab-tables.html
+    code-fold: true
   pdf:
     output-file: lab-tables.pdf
+
 
 # params:
 #   truc: html
@@ -32,6 +34,10 @@ engine: knitr
 ::: {.callout-important}
 
 ### Objectives
+
+The aim of this lab is to showcase the capabilities of `dplyr` to handle tables. In `R`, tables are basically handled as data frames. Provides a lot of tools to handle data frames. `dplyr` should be thought as a concise and consistent API for performing table calculus (the so-called *relational algebra* from database theory). `dplyr` offers *verbs* that implement the main operations of relational algebra: *projection*,  *selection*,  *joins*,  *grouping*, and *aggregation*.    
+
+
 
 
 :::
@@ -74,7 +80,7 @@ Check [nycflights13](https://nycflights13.tidyverse.org) for any explanation con
 
 ## Data loading 
 
-
+We will use data  from package `nycflights13`. Those data consist of five tables.  
 
 ```{r}
 flights <- nycflights13::flights
@@ -83,6 +89,8 @@ airports <- nycflights13::airports
 airlines <- nycflights13::airlines
 planes <- nycflights13::planes
 ```
+
+The five tables have been loaded as 5 data frames. They could also be considered as tables. Living in an in memory relational database operated by `SQLite`.  
 
 ```{r}
 #| eval: true
@@ -94,6 +102,9 @@ weather_lite <- copy_to(con, nycflights13::weather)
 airlines_lite <- copy_to(con, nycflights13::airlines)
 ```
 
+
+This allows us to handle the tables/data frames as tables living in a plain database. If you are familiar with SQL, this is well-known territory.  
+
 ```{r}
 flights_lite |>
   select(contains("delay")) |>
@@ -101,7 +112,7 @@ flights_lite |>
 ```
 
 
-View data in spreadsheet style.
+Anyway you can view the data in spreadsheet style.
 
 ```{r}
 #| eval: false
@@ -109,11 +120,11 @@ View(flights)
 ```
 
 
-Ask for help about table `flights`
+Ask for help about table `flights` (use `head` and `glimpse`)
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 ?flights
@@ -135,19 +146,23 @@ airports |>
 
 ## First Queries (the `dplyr` way)
 
-Find all flights that
+Find all flights that:
 
 - Had an arrival delay of two or more hours
 
+Hint: use verb `filter`. 
+
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
   filter(arr_delay >= 120) |> 
-  nrow()
+  count()
 ```
+
+Compare with `SQL`
 
 ```{r}
 flights_lite |> 
@@ -158,22 +173,14 @@ flights_lite |>
 
 :::
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
-We can translate the `dplyr` pipeline into an `SQL` query.
-
-```{r}
-flights_lite |> 
-  filter(arr_delay >= 120) |> 
-  show_query()
-```
-
-We can even get some explanations
+We can translate the `dplyr` pipeline into an `SQL` query. We can even get some explanations
 
 ```{.r}
 flights_lite |> 
   filter(arr_delay >= 120) |> 
-  explain()
+  dplyr::explain()
 ```
 
 :::
@@ -186,16 +193,16 @@ flights_lite |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
   filter(dest %in% c("HOU", "IAH")) |>  
   nrow()
 
-flights |> 
-  filter(dest == "HOU" | dest == "IAH") |> 
-  count()
+# flights |> 
+#   filter(dest == "HOU" | dest == "IAH") |> 
+#   count()
 ```
 
 :::
@@ -205,28 +212,18 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
-
 flights_lite |> 
   filter(dest %in% c("HOU", "IAH")) |>  
   show_query()
 ```
 
-:::
-
-:::
-
-::: {.content-visible when-profile="solution"}
-
-::: {.callout-note title="Solution"}
-
 ```{r}
-
-flights_lite |> 
-  filter(dest == "HOU" | dest == "IAH") |> 
-  show_query()
+# flights_lite |> 
+#   filter(dest == "HOU" | dest == "IAH") |> 
+#   show_query()
 ```
 
 :::
@@ -250,14 +247,17 @@ airlines |>
   pull(carrier)
 ```
 
+Unfortunately, the next code is not supported. 
 ```{.r}
 #| eval: false
 airlines_lite |> 
   filter(stringr::str_starts(name, "United") |
-        stringr::str_starts(name, "American") |
-        stringr::str_starts(name, "Delta")) |> 
+         stringr::str_starts(name, "American") |
+         stringr::str_starts(name, "Delta")) |> 
   show_query()
 ```
+
+It would be the `dplyr` version of the following SQL code. 
 
 ```{.sql}
 SELECT *
@@ -267,13 +267,13 @@ WHERE "name" LIKE 'United%' OR
       "name" LIKE 'Delta%' ;
 ```
 
-[`stringr` is part of tidyverse](https://stringr.tidyverse.org)
+[`stringr` is part of tidyverse](https://stringr.tidyverse.org). It offers an API for string manipulations. 
 
 :::
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 We build on the tip above to extract the matching airlines codes. 
 
@@ -308,6 +308,8 @@ WHERE carrier IN (SELECT carrier
 ```
 We may also rely on a `NATURAL JOIN`.
 
+In this case,  the subquery can be mimicked using  a join. 
+
 ```{r}
 airlines |> 
   filter(str_detect(name, "United|Delta|American")) |> 
@@ -316,7 +318,7 @@ airlines |>
 #  sample_n(size=6)    # random sampling 
 ```
 
-
+This code is not legal. 
 ```{.r}
 #| eval: false
 airlines_lite |> 
@@ -335,7 +337,9 @@ airlines_lite |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
+
+We need to know the month numbers to answer this question. 
 
 ```{r}
 flights |> 
@@ -358,9 +362,11 @@ or even
 my_locale <- 'en_US.UTF-8'
 
 flights |> 
-  filter(lubridate::month(time_hour, label=T, abbr=F, 
+  filter(lubridate::month(time_hour, 
+                          label=T, 
+                          abbr=F, 
                           locale=my_locale) %in% 
-                    c('juillet', 'August', 'September')) |> 
+                    c('July', 'August', 'September')) |> 
   head()
 ```
 
@@ -371,7 +377,7 @@ flights |>
 
 ::: {.callout-important}
 
-When manipulating temporal information (date, time, duration), keep an eye on [what `lubridate` offers](https://lubridate.tidyverse.org). The API closely parallels what RDMS and Python offer. 
+When manipulating temporal information (date, time, duration), keep an eye on [what `lubridate` offers](https://lubridate.tidyverse.org). The API closely parallels what Relational Database Management Systems (RDMS) and Python (`datetime`) offer. 
 
 :::
 
@@ -379,7 +385,7 @@ When manipulating temporal information (date, time, duration), keep an eye on [w
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -396,7 +402,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -414,7 +420,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -447,13 +453,16 @@ Read [Chapter Transform in  R for Data Science 2nd Ed](https://r4ds.hadley.nz/da
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
+
+`R` provide several functions to handle missing (NA) data
 
 ```{r}
 flights |> 
   filter(is.na(dep_time)) |> 
   count(by=origin)
 ```
+
 
 ```{r}
 flights_lite |> 
@@ -475,8 +484,8 @@ flights_lite |>
 Note that combining `dplyr` verbs and pipes (`|>` or `|>`) provides a much 
 more readable and modular approach than vanilla `SQL`. 
 
-- Using `dplyr`  and pipe, the order in which operation are executed is clear and obvious. In SQL, it is counterintuitive.
--  
+Using `dplyr`  and pipe, the order in which operation are executed is clear and obvious. In SQL, it is counterintuitive.
+ 
 
 :::
 
@@ -501,15 +510,20 @@ The introduction to [`tidyselect`](https://tidyselect.r-lib.org) is a must read.
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
+
+This is an opportunity to introduce 
+
+- tidy selection helpers like `across()`
+- tidying functions like `pivot_longer` from package `tidyr`.  
 
 ```{r}
 flights |> 
-  filter(is.na(dep_time)) |> 
-  summarize(across(everything(), ~ all(is.na(.)))) |> 
-  pivot_longer(cols = everything()) |> 
-  filter(value) |> 
-  select(name)
+  filter(is.na(dep_time)) |>     # keep lines with missing `dep_time`
+  summarize(across(everything(), \(x) all(is.na(x)))) |>    # compute the number of NA cells in other columns
+  pivot_longer(cols = everything()) # |>  # make the resulting table thin
+  # filter(value) |>  
+  # select(name)
 ```
 
 
@@ -546,7 +560,7 @@ not_cancelled <-  flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -563,8 +577,9 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
+Function `skim` from package `skimr` delivers per column summaries. 
 
 ```{r}
 flights |> 
@@ -581,10 +596,12 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 #| echo: false
+flights |>
+  arrange(!is.na(dep_time))
 ```
 
 :::
@@ -596,7 +613,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -617,7 +634,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -632,7 +649,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -648,7 +665,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -690,7 +707,7 @@ The database provides all we need with columns `distance` and `air_time`.  Other
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -706,7 +723,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -791,7 +808,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 vars <- c("year", "month", "day", "dep_delay", "arr_delay")
@@ -829,7 +846,7 @@ select(
 
 ::: {.content-visible when-profile="solution"} 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 By default, `select` helpers ignore case. 
 This complies with a similar behavior in RDBMS 
@@ -842,7 +859,7 @@ This complies with a similar behavior in RDBMS
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 select(flights, 
@@ -862,7 +879,7 @@ select(flights,
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -877,6 +894,13 @@ df <- flights |>
                 .names="{.col}"))
 ```
 
+We should do something more here. We should recast the `dep_time`, `arr_time`,  and so on columns as durations. This would allow us to perform time arithmetics with `lubridate`. 
+
+```{r}
+lubridate::interval(start=Sys.time(), 
+                    end= Sys.time() + 
+                        lubridate::duration(num=70, units="minutes"))
+```
 :::
 
 :::
@@ -885,7 +909,7 @@ df <- flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df |> 
@@ -901,7 +925,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 
@@ -920,7 +944,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df |> 
@@ -939,7 +963,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 
@@ -960,7 +984,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 
@@ -988,7 +1012,7 @@ For `29` flights it is positive. The discrepancy is then exactly equal to `24` h
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df |> 
@@ -1019,7 +1043,7 @@ Carefully read the documentation for `min_rank()`.
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1046,7 +1070,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="Solution"}
+::::: {.callout-tip title="Solution" collapse="true"}
 
 
 ```{r}
@@ -1116,7 +1140,7 @@ flights_lite |>
   
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1128,7 +1152,7 @@ flights |>
 
 :::
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1148,7 +1172,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"} 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 :::
 
@@ -1158,7 +1182,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 not_cancelled |> 
@@ -1174,7 +1198,7 @@ not_cancelled |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1192,7 +1216,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1218,7 +1242,7 @@ Challenge: can you disentangle the effects of bad airports vs. bad carriers? Why
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1245,7 +1269,7 @@ flights |>
 ::: {.content-visible when-profile="solution"} 
 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 
 :::
@@ -1260,7 +1284,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1316,7 +1340,7 @@ $$
 
 ::: {.content-visible when-profile="solution"} 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 :::
 
@@ -1326,7 +1350,7 @@ $$
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1346,7 +1370,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"} 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 Definitely before 9a.m. 
 
@@ -1371,7 +1395,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |>
@@ -1391,7 +1415,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"} 
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 Would be easy with `ROLLUP (dest, flight)`
 ```{.sql}
@@ -1421,7 +1445,7 @@ Using `dplyr`, it is easy. See [A second look at `group_by`](https://sebastiansa
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1440,7 +1464,7 @@ flights |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 We have used the fact that the output of `summarise(., total_delay_flight=sum(arr_delay))`
 is still a grouped dataframe/tibble (with grouping variable `dest`). At the following line, 
@@ -1473,7 +1497,7 @@ WINDOW w_per_dest AS (PARTITION BY dest) ;
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 
@@ -1506,7 +1530,7 @@ Something still needs fixing here: some flights never took off (`is.na(dep_time)
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df <- flights |> 
@@ -1534,7 +1558,7 @@ patchwork::wrap_plots(p1 + p2 )
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 p2 + geom_rug(alpha=.5) +
@@ -1552,7 +1576,7 @@ Let us visualize destinations and origins of the speedy flights.
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df |> 
@@ -1573,7 +1597,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 df |> 
@@ -1596,7 +1620,7 @@ df |>
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 ```{r}
 
 ```
@@ -1613,7 +1637,7 @@ Assume a plane is characterized by `tailnum`. Some flights have no `tailnum`. We
 
 ::: {.content-visible when-profile="solution"}
 
-::: {.callout-note title="Solution"}
+::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r}
 flights |> 

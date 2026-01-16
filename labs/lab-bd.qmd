@@ -1,0 +1,145 @@
+---
+title: 'Bivariate analysis'
+categories: [Table calculus, '`dplyr`', '`dbplyr`', '`dtplyr`', '`data.table`', '`arrow`']
+date: "`r Sys.time()`"
+
+
+execute:
+  echo: true
+  eval: false
+  collapse: false
+
+
+format:
+  html:
+    output-file: lab-bd.html
+  pdf:
+    output-file: lab-bd.pdf
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+[https://dbplyr.tidyverse.org](https://dbplyr.tidyverse.org)
+
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+library(dbplyr, warn.conflicts = FALSE)
+library(DBI)
+library(RPostgreSQL)
+```
+
+```{r}
+con <- DBI::dbConnect(
+    RPostgreSQL::PostgreSQL(),
+    user=Sys.getenv('USERNAME'),
+    password=rstudioapi::askForPassword(),
+    dbname="bd_2023-24",
+    host="localhost",
+    port=5436
+)
+
+
+```
+
+
+## With `DBI::...`
+
+```{r}
+dbGetQuery(con, 
+    "SELECT 
+        count(*) 
+    FROM 
+        nycflights.flights ;"
+)
+```
+
+https://dbplyr.tidyverse.org/index.html
+
+
+
+```{r}
+res <- dbSendQuery(con, 
+    "SELECT 
+        origin, 
+        count(*) AS n  
+    FROM 
+        nycflights.flights
+    GROUP BY 
+        origin"
+)
+
+df <- dbFetch(res)
+
+dbClearResult(res)
+
+head(df)
+```
+
+
+## With `dbplyr::...`
+
+
+```{r}
+dbplyr::db_connection_describe(con)
+```
+
+```{r}
+tbl(con, 
+    sql(
+        "SELECT 
+            origin, 
+            count(*) AS n  
+        FROM 
+            nycflights.flights
+        GROUP BY 
+            origin")
+)
+```
+
+
+```{r}
+pg_flights <- tbl(con,I("nycflights.flights"))
+pg_airlines <- tbl(con,I("nycflights.airlines"))
+```
+
+```{r}
+pg_flights |> 
+    count(by=origin)
+```
+
+
+```{r}
+pg_flights |> 
+    group_by(origin, dest) |> 
+    summarise(mean_arr_delay= mean(arr_delay, na.rm=T))
+```
+
+
+```{r}
+pg_flights |> 
+    group_by(origin, dest) |> 
+    summarise(across(ends_with("delay"), \(x) mean(x, na.rm=TRUE)))
+```
+
+```{r}
+pg_airlines |> 
+    glimpse()
+```
+
+```{r}
+pg_flights |> 
+    inner_join(pg_airlines, by=c("carrier")) |> 
+    group_by(origin, carrier) |> 
+    summarise(N=n(), across(ends_with("delay"), .fns=\(x) mean(x, na.rm=TRUE), .names="Avg {.col}"))
+```
+
+
+
+```{r}
+dbDisconnect(con)
+```
+
+Enjoy!

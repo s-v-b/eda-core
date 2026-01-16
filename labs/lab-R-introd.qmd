@@ -132,9 +132,9 @@ You shall not confuse *installing* (on your hard-drive) and *loading* (in sessio
   
 :::
 
-::: {.content-visible when-profile='solution'} 
+::: {.content-visible when-profile='solution' collapse="true"} 
  
-::: {.callout-tip}
+::: {.callout-tip collapse="true"}
 
 ### Solution
 
@@ -202,7 +202,7 @@ ls()
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r, three-vectors}
 #| eval: true
@@ -233,7 +233,7 @@ ls()
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout-tip title="Solution" collapse="true"}
 
 ```{r, shallow}
 #| eval: true
@@ -267,7 +267,7 @@ identical(w,y)
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-tip title="Solution" collapse="false"}
+::::: {.callout-tip title="Solution" collapse="true"}
 
 
 Package `lobstr` lets us explore low-level aspects of `R` (and much more). Function `lobstr::obj_addr()` returns the address of  the object denoted by the argument. 
@@ -347,7 +347,7 @@ z[c(2, 1, 1)]
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r, slicing-2}
 #| eval: true
@@ -375,7 +375,7 @@ If the length of mask and and the length of the sliced vector do not coincide, w
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 No error is signaled, the returned sequence is as long as the number of truthies in the mask. 
 
@@ -429,7 +429,7 @@ z[-11]
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r, sliced-assignment}
 #| eval: true
@@ -461,7 +461,7 @@ z[-(1:5)]
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r, exclusion-slicing}
 #| eval: true
@@ -484,7 +484,7 @@ How would you select the last element from a vector (say `z`)?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| eval: true
@@ -514,7 +514,7 @@ Reverse the entries of a vector. Find two ways to do that.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: reverse
@@ -543,7 +543,7 @@ building grids of regularly spaced elements (these elements can be numeric or no
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: rep-101
@@ -696,7 +696,7 @@ How would you compute a factorial?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: factorial
@@ -720,7 +720,7 @@ Approximate $\sum_{n=1}^\infty 1/n^2$ within $10^{-3}$?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 $$\sum_{n > N} \frac{1}{n^2} < \sum_{n > N} \frac{1}{n(n-1)} = \sum_{n > N} \left(\frac{1}{n-1}-\frac{1}{n}\right) = \frac{1}{N}$$
 So we may pick $N=1000$. 
@@ -752,7 +752,7 @@ How would you compute the inner product between two (atomic numeric) vectors?
 ::: {.content-visible when-profile="solution"}
 
 
-::::: {.callout title="Solution" collapse="false"} 
+::::: {.callout title="Solution" collapse="true"} 
 
 Inner product between two vectors can be computed as a matrix product between a row vector and a column vector using `%*%`. Is this a good idea?
 
@@ -800,7 +800,7 @@ From the evaluation of the preceding chunk, can you guess whether it is easier t
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"} 
+::::: {.callout title="Solution" collapse="true"} 
 
 Default traversal seems to proceed columnwise. 
 
@@ -888,7 +888,7 @@ A   <- 0 ; A
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"} 
+::::: {.callout title="Solution" collapse="true"} 
 
 There is! 
 
@@ -952,7 +952,7 @@ lobstr::obj_addr(B) ; lobstr::obj_addr(A)
 
 ::: {.content-visible when-profile="solutio"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 La première affectation, assigne une copie de la matrice `A` à l'idenficateur `"B"`. 
 
@@ -1076,7 +1076,7 @@ $$\langle A, B\rangle_{\text{HS}} = \text{Trace} \big(A \times B^\top\big)$$
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 In `R`, `trace()` does not return the trace of a matrix! Function is used for debugging. 
 
@@ -1208,7 +1208,7 @@ What is the difference between logical operators `||`  and `|` ?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 `||` is *lazy*. It does not evaluate its second argument if the
 first one evaluates to `TRUE`.
@@ -1242,7 +1242,7 @@ Look at the definition of `all` and `any`.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
  
 A square matrix is symmetric iff it is equal to its transpose. 
 Recall that `t(A)` denotes the transpose of matrix `A`. 
@@ -1334,7 +1334,7 @@ lobstr::tree(y)
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: list-1
@@ -1405,7 +1405,7 @@ Functions `is_atomic(), is_list(), ..., obj_addr()` are from packages `rlang` an
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r, enigma-list-2}
 #| eval: true
@@ -1440,7 +1440,7 @@ How would you replace `"A"` in `x` with `"K"`?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 
 ```{r}
@@ -1498,7 +1498,7 @@ What is the class of `codes` ?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: classy-lookup-table
@@ -1529,7 +1529,7 @@ Package `stringr` offers a function `str_to_title()` that could be of interest.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: capitalize
@@ -1620,7 +1620,7 @@ We may want to collapse `virginica`  and `versicolor` into a single level called
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: factors-iris-collapse
@@ -1650,7 +1650,7 @@ Factors are used to represent _categorical_ variables.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: load_whiteside
@@ -1681,7 +1681,7 @@ y <- whiteside$Insul          # picking a factor column
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: factors-whiteside
@@ -1710,7 +1710,7 @@ Summarize factor `y`
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: factors-whiteside-summary
@@ -1771,7 +1771,7 @@ Make `z` ordered with level `After` preceding `Before`. Does ordering impact the
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: factors-whiteside-ordered
@@ -1787,7 +1787,7 @@ forcats::fct_count(forcats::fct_infreq(z))
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: plot-factors-whiteside-ordered
@@ -1898,7 +1898,7 @@ Function `sample()` from base `R` is very convenient
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: permute-slice-columns
@@ -1954,7 +1954,7 @@ __Hint:__ use `class(), is.data.frame() tibble::is_tibble()`
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 
@@ -1981,7 +1981,7 @@ Extract the name and the type of each column.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_colnames
@@ -2025,7 +2025,7 @@ Use `across()` from `dplyr` 1.x.  See [Documentation](https://dplyr.tidyverse.or
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_mean
@@ -2086,7 +2086,7 @@ How should we compute the column means now?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_NA_mean
@@ -2113,7 +2113,7 @@ Decide to ignore `NA` and to compute the mean with the available data
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_NA_mean_options
@@ -2139,7 +2139,7 @@ Show this leads to a different result.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_NA_drop
@@ -2164,7 +2164,7 @@ Compute the minimum, the median, the mean and the maximum of numerical columns
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 ```{r}
 #| label: flight_NA_summary
 #| eval: true
@@ -2198,7 +2198,7 @@ Check with [https://dplyr.tidyverse.org/reference/scoped.html?q=funs#arguments](
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: nicer-output-gt
@@ -2231,7 +2231,7 @@ Mimic `summary` on numeric columns
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_NA_summary-2
@@ -2279,7 +2279,7 @@ Have a look at Section [Operate on a selection of variables](https://dplyr.tidyv
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_itinerary
@@ -2305,7 +2305,7 @@ Compute the coefficient of variation (ratio between the standard deviation and t
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_coef_var
@@ -2334,7 +2334,7 @@ Compute for each flight the ratio between the `distance` and the `air_time` in  
 ::: {.content-visible when-profile="solution"}
 
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: flight_ratio
@@ -2367,7 +2367,7 @@ Which carrier suffers the most delay?
 
 ::: {.content-visible when-profile="solution"} 
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 ```{r}
 #| label: flight_delay
 #| eval: true
@@ -2426,7 +2426,7 @@ Can you explain what happens?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 When `dplyr::filter(year==year) ` does `year` refer to the column of `data` or to the variable in the global environment?  
 
@@ -2534,7 +2534,7 @@ $$\binom{n}{k} = \binom{n-1}{k-1} + \binom{n-1}{k}$$
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| eval: true
@@ -2564,7 +2564,7 @@ Locate the smallest element in a numerical vector
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| eval: true
@@ -2607,7 +2607,7 @@ Find the location of the minimum in a vector `v`
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: find-min
@@ -2647,7 +2647,7 @@ Write a loop that checks whether vector `v` is non-decreasing.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: is_non_decreasing
@@ -2696,7 +2696,7 @@ Write a function that checks whether vector `v` is non-decreasing.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: function_test_is_non_decreasing
@@ -2743,7 +2743,7 @@ Write a function with integer parameter $n$, that returns the Pascal Triangle wi
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: pascal_triangle
@@ -2802,7 +2802,7 @@ $$F_{n+2} = F_{n+1} + F_n \qquad F_1= F_2 = 1$$
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: fibonacci
@@ -2832,7 +2832,7 @@ Write a function that perform binary search in a non-decreasing vector.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: binary_search
@@ -2926,7 +2926,7 @@ Write truth tables for `&, |, &&, ||, !` and `xor`
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: truth-table
@@ -2957,7 +2957,7 @@ and returns `TRUE` if it is lower triangular.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| label: lower-triangular
@@ -2987,7 +2987,7 @@ this way of computing the Pascal triangle?
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout title="Solution" collapse="false"}
+::::: {.callout title="Solution" collapse="true"}
 
 ```{r}
 #| eval: true

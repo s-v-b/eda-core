@@ -1,0 +1,622 @@
+---
+title: "R programming: generics"
+date: "`r Sys.time()`"
+
+
+format:
+  html:
+    output-file: lab-progr.html
+  pdf:
+    output-file: lab-progr.pdf
+ 
+engine: knitr
+---
+
+
+{{< include _preamble.qmd >}}
+
+
+```{r}
+#| echo: true
+#| message: false
+#| code-fold: true
+stopifnot(
+  require(Hmisc),
+  require(skimr),
+  require(patchwork),
+  require(ggforce),
+  require(glue),
+  require(ggfortify),
+  require(broom),
+  require(tidyverse)
+)
+
+tidymodels::tidymodels_prefer(quiet = TRUE)
+
+old_theme <-theme_set(
+  theme_minimal(base_size=9, 
+                base_family = "Helvetica")
+)
+```
+
+
+
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| 
+gc <- options(ggplot2.discrete.colour="viridis")
+gc <- options(ggplot2.discrete.fill="viridis")
+gc <- options(ggplot2.continuous.fill="viridis")
+gc <- options(ggplot2.continuous.colour="viridis")
+```
+
+## Objectives
+
+
+```{r}
+#| echo: true
+#| 
+stopifnot(
+  require(rlang),
+  require(lobstr),
+  require(sloop),
+  require(devtools),
+  require(usethis),
+  require(testthat),
+  require(generics)
+)
+```
+
+
+
+## Generics and S3 classes
+
+Let us first create an instance of class `lm`.
+
+```{r}
+lm0  <- lm(Gas ~ Insul * Temp, MASS::whiteside)
+```
+
+::: {.callout-note title='Question'} 
+
+- What does function `class()` do? 
+- Is it possible to belong to type `list`  and to class `lm` simultaneously?
+- In `R` what is an *attribute*? 
+- How do we *set* and *get* attributes?  
+- What does function `inherits()` do?
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+class(lm0)
+is.list(lm0)
+attributes(lm0)
+inherits(lm0,"list")
+inherits(lm0, "lm")
+```
+ 
+::: 
+ 
+:::
+
+::: {.callout-note title='Question'} 
+
+Load package `sloop`.
+
+- What does `sloop::otype()` do? Apply it to an object of class `lm`.
+- What happens when we first `unclass()` the object?
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+sloop::otype(lm0)
+sloop::otype(unclass(lm0))
+```
+ 
+::: 
+:::
+
+
+::: {.callout-note title='Question'} 
+ 
+`sloop` exports functions `s3_class()` and `s3_get_method()`  
+
+- Apply `s3_class()` to all members of `lm0`
+- What is the `otype` of `autoplot()` applied to an object of class `lm`?
+- 
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+sloop::s3_class(lm0)
+```
+
+```{r}
+sloop::s3_get_method(autoplot.lm)
+```
+
+```{r}
+sloop::s3_get_method(augment.lm)
+```
+ 
+::: 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+sloop::s3_methods_class("prcomp") |>
+  gt::gt() |>
+  gt::tab_header("Generics of class prcomp")
+```
+ 
+::: 
+ 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+sloop::s3_dispatch(autoplot(lm0))
+```
+ 
+::: 
+
+:::
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+
+```{r}
+data(UCBAdmissions)
+class(UCBAdmissions)
+otype(UCBAdmissions)
+```
+
+ 
+::: 
+:::
+
+::: {.callout-note title='Question'} 
+ 
+ 
+:::
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+sloop::s3_class(UCBAdmissions)
+# sloop::s3_get_method(autoplot.table)
+# sloop::s3_get_method(augment.table)
+``` 
+::: 
+:::
+
+
+- [OO in Advanced R Programming 1st Edition](http://adv-r.had.co.nz/OO-essentials.html)
+- [S3 classes  Advanced R 2nd Edition](https://adv-r.hadley.nz/s3.html)
+
+
+
+
+
+
+
+## Programming with `dplyr` and `ggplot2`
+
+We first aim at programming a function that takes as input a dataframe `df`, a column name `col`, and that, depending on the type of the column denoted by `col`, plots a histogram (for numerical column), a barplot (for factors), or raise an error of the column is neither categorical, nor numerical.
+
+The function should return a ggplot object.
+
+Here is a first attempt. 
+
+Let us first build a toy tibble. 
+
+```{r}
+tb <- tibble( 
+  col_num = rnorm(100), 
+  col_fac = as_factor(sample(letters, 100, replace = T)), 
+  col_ts = Sys.time() + duration(sample(1:20, 100, replace=T),units="days")
+) 
+
+tb |> 
+  head()
+```
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+
+```{r}
+gg_obj <-  function(df, col){
+  
+  vct <- df[[col]]  # <1>
+  tp <- class(vct)
+
+  if (tp != "numeric" & tp !="factor") {
+    stop(paste0(col, " is of wrong type!"))
+  }
+
+  p <- ggplot(df) + 
+    aes(x=.data[[col]])  # <2>
+
+  if (tp=="numeric") {
+    p <- p + geom_histogram()
+  } else {
+    p <- p + geom_bar()
+  }
+
+  p  
+}
+
+```
+1. List component is accessed by name. `col` is a string. 
+2. `.data` is a pronoun for the dataframe component of the `ggplot` object
+
+```{r}
+(
+  gg_obj(tb, "col_num") +
+    labs(
+      title= "Histogram", 
+      subtitle= "Numerical column")
+) + (
+  gg_obj(tb, "col_fac") +
+    labs(
+      title= "Barplot",
+      subtitle= "Factor column"
+    )
+)
+```
+
+:::
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+- Pass more optional arguments to `geom_...` (use ellipsis `...`)
+- Avoid quoting the column name
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.content-visible when-profile='solution'} 
+ 
+```{r}
+gg_obj_2 <-  function(df, col, ...){
+  params <- list(...)
+  vct <- pull(df, {{col}})
+  tp <- class(vct)[1]
+
+  if (tp != "numeric" & tp !="factor") {
+    stop("column is of wrong type!")
+    return
+  }
+
+  p <- ggplot(df) + 
+    aes(x={{col}})  # <1>
+
+  if (tp=="numeric") {
+    p <- p + geom_histogram(...) # <2>
+  } else {
+    p <- p + geom_bar(...)
+  }
+
+  p  
+}
+```
+1. standard technique for programming with tidy-evaluation: *embracing*.
+2. using the ellipsis 
+
+```{r}
+#| eval: true
+(
+  gg_obj(tb, "col_num") +
+    labs(
+      title= "Histogram", 
+      subtitle= "Numerical column")
+) +
+(
+  gg_obj_2(tb, col_num, fill="red") +
+    labs(
+      title= "Histogram, tuning color", 
+      subtitle= "Numerical column")
+)
+```
+ 
+::: 
+:::
+
+
+::: {.callout-note title="Question"}
+
+
+
+:::
+
+
+::: {.callout-note title="Question"}
+
+How could you add a geom_point() layer to each element of the following list?
+
+```{r}
+plots <- list(
+  ggplot(mpg, aes(displ, hwy)),
+  ggplot(diamonds, aes(carat, price)),
+  ggplot(faithfuld, aes(waiting, eruptions, size = density))
+)
+```
+
+From [R Advanced Programming](https://ggplot2-book.org/programming#exercises-3)
+
+:::
+
+
+::: {.content-visible when-profile='solution'} 
+ 
+::: {.callout-tip title='Solution'} 
+ 
+```{r}
+plots |> 
+  map(\(x) x + geom_point()) |>
+  patchwork::wrap_plots()
+```
+
+::: 
+:::
+
+## Inside `lm()`
+
+::: {.callout-note title="Question"}
+
+In classes like `lm`, `prcomp`, ... we have a member called `call`. What does it represent? How is it constructed? 
+
+{{< fa hand-point-right >}} First, read the code of `lm`.
+
+:::
+
+
+```{.r}
+> lm 
+function (formula, data, subset, weights, na.action, method = "qr", 
+    model = TRUE, x = FALSE, y = FALSE, qr = TRUE, singular.ok = TRUE, 
+    contrasts = NULL, offset, ...) 
+{
+    ret.x <- x
+    ret.y <- y
+    cl <- match.call()
+    mf <- match.call(expand.dots = FALSE)
+    m <- match(c("formula", "data", "subset", "weights", "na.action", 
+        "offset"), names(mf), 0L)
+    mf <- mf[c(1L, m)]
+    mf$drop.unused.levels <- TRUE
+    mf[[1L]] <- quote(stats::model.frame)
+    mf <- eval(mf, parent.frame())
+    if (method == "model.frame") 
+        return(mf)
+    else if (method != "qr") 
+        warning(gettextf("method = '%s' is not supported. Using 'qr'", 
+            method), domain = NA)
+    mt <- attr(mf, "terms")
+    y <- model.response(mf, "numeric")
+    w <- as.vector(model.weights(mf))
+    if (!is.null(w) && !is.numeric(w)) 
+        stop("'weights' must be a numeric vector")
+    offset <- model.offset(mf)
+    mlm <- is.matrix(y)
+    ny <- if (mlm) 
+        nrow(y)
+    else length(y)
+    if (!is.null(offset)) {
+        if (!mlm) 
+            offset <- as.vector(offset)
+        if (NROW(offset) != ny) 
+            stop(gettextf("number of offsets is %d, should equal %d (number of observations)", 
+                NROW(offset), ny), domain = NA)
+    }
+    if (is.empty.model(mt)) {
+        x <- NULL
+        z <- list(coefficients = if (mlm) matrix(NA_real_, 0, 
+            ncol(y)) else numeric(), 
+                  residuals = y, 
+                  fitted.values = 0 * y, 
+                  weights = w, 
+                  rank = 0L, 
+                  df.residual = if (!is.null(w)) sum(w != 0) else ny
+              )
+        if (!is.null(offset)) {
+            z$fitted.values <- offset
+            z$residuals <- y - offset
+        }
+    }
+    else {
+        x <- model.matrix(mt, mf, contrasts)
+        z <- if (is.null(w)) 
+            lm.fit(x, y, offset = offset, singular.ok = singular.ok, 
+                ...)
+        else lm.wfit(x, y, w, offset = offset, singular.ok = singular.ok, 
+            ...)
+    }
+    class(z) <- c(if (mlm) "mlm", "lm")
+    z$na.action <- attr(mf, "na.action")
+    z$offset <- offset
+    z$contrasts <- attr(x, "contrasts")
+    z$xlevels <- .getXlevels(mt, mf)
+    z$call <- cl
+    z$terms <- mt
+    if (model) 
+        z$model <- mf
+    if (ret.x) 
+        z$x <- x
+    if (ret.y) 
+        z$y <- y
+    if (!qr) 
+        z$qr <- NULL
+    z
+}
+<bytecode: 0x55564224e930>
+<environment: namespace:stats>
+```
+
+::: {.callout-note title='Question'} 
+ 
+Have a look at function `match.call()`
+
+
+ 
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.content-visible when-profile='solution'} 
+ 
+ 
+
+
+```{r}
+e <- match.call(get, call("get", "abc", i = FALSE, p = 3))
+
+is_expression(e)
+
+is_call(e)
+
+lobstr::ast(match.call(get, call("get", "abc", i = FALSE, p = 3)))
+```
+
+Let us explore the next toy example. 
+
+```{r}
+fun <- function(x, lower = 0, upper = 1) {
+  structure((x - lower) / (upper - lower), CALL = match.call())
+}
+
+
+w <- fun(4 * atan(1), u = pi)
+
+type_of(w)
+
+w
+
+str(w)
+
+x <- attr(w, 'CALL')
+
+typeof(x)
+
+is_call(x)
+
+eval(x)  
+# try also eval_tidy(), eval_bare
+```
+
+:::
+
+:::::
+
+## Data masking and environments
+
+::: {.callout-note title="Question"}
+
+
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+::: {.callout-tip title='Solution'} 
+ 
+ 
+:::
+
+:::::
+
+
+## Tidy evaluation
+
+::: {.callout-note title="Question"}
+
+What is *quasi-quotation*?
+
+Keep the `rlang` cheatsheet around. 
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+```{r}
+
+```
+
+
+
+:::::
+
+::: {.callout-note title="Question"}
+
+Explain the difference between an *expression* and a *quosure*
+
+:::
+
+::::: {.content-visible when-profile="solution"}  
+
+
+
+:::::
+
+
+::: {.callout-note title="Question"}
+
+
+
+:::
+
+## References 
+
+[Programming with `ggplot`](https://ggplot2-book.org/programming)
+
+
+

@@ -35,7 +35,7 @@ engine: knitr
 execute:
   echo: true
   eval: true
-  collapse: true
+  collapse: false
   freeze: auto
   cache: true
 

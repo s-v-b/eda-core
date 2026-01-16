@@ -98,7 +98,6 @@ stopifnot(
   require(gapminder),
   require(ggrepel)
 )
-
 ```
 
 The data we will use can be obtained by loading package `gapminder`
@@ -115,7 +114,7 @@ You can do that using base `R` `install.packages()` function:
 install.packages("tidyverse")
 ```
 
-It is often faster to use functions from package `pak`
+It is often faster and more convenient to use functions from package `pak`
 
 ```{.r}
 install.packages("pak")
@@ -656,7 +655,7 @@ Note that we only use global aesthetic mappings. This makes sense since we do no
 ::: {.callout-tip title="solution"}
 
 In this enrichment of the graphical object, *guides* have been
-automatically added for two aesthetics: `color` and `size`. Those two
+automatically added for two *aesthetics*: `color` and `size`. Those two
 guides are deemed necessary since the reader has no way to guess the
 mapping from the five levels of `continent` to color (the color scale),
 and the reader needs help to connect population size and bubble size.

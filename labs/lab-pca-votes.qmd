@@ -1,0 +1,207 @@
+---
+date: "`r Sys.time()`"
+title: "LAB: Elections and Principal Component Analysis"
+
+
+execute:
+  echo: true
+  eval: false
+  collapse: false
+
+format:
+  html:
+    output-file: lab-pca-votes.html
+  pdf:
+    output-file: lab-pca-votes.pdf
+
+
+engine: knitr
+draft: true
+---
+
+
+```{r}
+#| label: setup-packages
+#| echo: true
+#| message: false
+#| warning: false
+#| include: true
+
+# We will use the following packages. 
+# If needed, install them : pak::pkg_install(). 
+stopifnot(
+  require("corrr"),
+  require("magrittr"),
+  require("lobstr"),
+  require("ggforce"),
+  require("gt"),
+  require("glue"),
+  require("skimr"),
+  require("patchwork"), 
+  require("tidyverse"),
+  require("ggfortify"),
+  require("autoplotly"),
+  require(fs)
+)
+```
+```{r}
+#| label: setup-theme
+#| message: false
+#| warning: false
+#| include: true
+#| 
+
+old_theme <- theme_set(theme_minimal())
+
+options(ggplot2.discrete.colour="viridis")
+options(ggplot2.discrete.fill="viridis")
+options(ggplot2.continuous.fill="viridis")
+options(ggplot2.continuous.colour="viridis")
+```
+
+
+{{< include _preamble.qmd >}}
+
+```{r}
+#| echo: false
+#| eval: true
+#|
+# source(file = "./UTILS/make_biotiful.R")
+```
+
+
+## Paris Open Data
+
+### Scrutins
+
+```{r}
+scrutins <-  bind_rows(
+  tibble(title='European P', rounds=1, year=seq(2004, 2024, 5)),
+  tibble(title='Parliament', rounds=2, year=c(seq(2002, 2022, 5),2024)),
+  tibble(title='President', rounds=2, year=seq(2002, 2022, 5)),
+  tibble(title='Local', rounds=2, year=c(2001, seq(2008, 2020, 6))),
+  tibble(title='Régionales', rounds=2, year=c(2004, 2010, 2015, 2021))
+  )
+
+scrutins |> slice_sample(n=5) |> arrange(year) |> gt::gt()
+```
+
+```{r}
+keys <- c(
+  "https://opendata.paris.fr/explore/dataset/elections-legislatives-2024-2emetour/information/"
+)
+
+furl
+```
+
+```{r}
+furl <- "https://data.opendatasoft.com/api/explore/v2.1/catalog/datasets/elections-france-presidentielles-2022-1er-tour-par-bureau-de-vote@public/exports/parquet?lang=en&refine=dep_name%3A%22Paris%22&timezone=Europe%2FParis"
+
+tb <- arrow::read_parquet('/home/boucheron/Downloads/elections-france-presidentielles-2022-1er-tour-par-bureau-de-vote@public (1).parquet')
+```
+
+
+```{r}
+furl <- "https://data.opendatasoft.com/api/explore/v2.1/catalog/datasets/elections-france-presidentielles-2022-2eme-tour-par-bureau-de-vote@public/exports/parquet?lang=en&refine=dep_name%3A%22Paris%22&timezone=Europe%2FParis"
+
+r <- httr::GET(furl)
+
+r$status_code
+```
+
+
+```{r}
+url <- "https://data.opendatasoft.com/explore/dataset/elections-france-presidentielles-2022-1er-tour-par-bureau-de-vote@public/export/"
+
+
+```
+
+
+```{r}
+euro_urls <- 
+c(
+"https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2019/exports/parquet?lang=en&timezone=Europe%2FBerlin",
+"https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2014/exports/parquet?lang=en&timezone=Europe%2FBerlin",
+"https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2024/exports/parquet?lang=en&timezone=Europe%2FBerlin",
+"https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2009/exports/parquet?lang=en&timezone=Europe%2FBerlin",
+"https://data.smartidf.services/api/explore/v2.1/catalog/datasets/elections-europeennes-2004/exports/parquet?lang=en&timezone=Europe%2FBerlin"
+)
+
+for (u in euro_urls) {
+
+  r <- httr::GET(u)
+  if (200==as.integer(r$status_code)) print(u)
+
+}
+```
+### Bureaux de vote
+
+```{r}
+dwnlds <- fs::fs_path('~') / 'Downloads'
+dwnlds_fls <- fs::dir_ls(dwnlds)
+fpth <- dwnlds_fls[stringr::str_detect( dwnlds_fls, 'secteurs')]
+
+tb_secteurs <- arrow::read_parquet(fpth)
+```
+
+```{r}
+keys <- c(
+  "zones-de-rattachement-des-bureaux-de-vote-en-2012",
+  "zones-de-rattachement-des-bureaux-de-vote-en-2014",
+  "secteurs-des-bureaux-de-vote-en-2017",
+  "secteurs-des-bureaux-de-vote-en-2020",
+  "secteurs-des-bureaux-de-vote-en-2021",
+  "secteurs-des-bureaux-de-vote-leg-2022",
+  "secteurs-des-bureaux-de-vote-2024"
+)
+
+furl <- "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/{x}/exports/parquet?lang=fr&timezone=Europe%2FBerlin"
+
+for (x in keys) {
+
+  r <- httr::GET(glue(furl))
+  if (200!=as.integer(r$status_code)) print(glue(furl))
+
+}
+```
+
+Localisation des bureaux de votes
+
+```{r}
+keys_loc_bureaux <- c(
+  "bureaux-de-vote-en-2021",
+  "bureaux-de-votes",
+  "bureaux-de-vote-2024",
+  "bureaux-de-vote-2025"
+)
+
+furl <- "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/{x}/exports/parquet?lang=fr&timezone=Europe%2FBerlin"
+
+for (x in keys_loc_bureaux) {
+  print(glue(furl))
+  r <- httr::GET(glue(furl))
+  print(as.integer(r$status_code))
+}
+```
+
+
+
+```{r}
+
+```
+
+## Elections
+
+
+## PCA 
+
+
+## Clustering
+
+
+# References 
+
+
+
+
+[](https://github.com/datagouv/bureau-vote)

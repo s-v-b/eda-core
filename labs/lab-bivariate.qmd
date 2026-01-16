@@ -15,14 +15,6 @@ format:
     output-file: lab-bivariate.html
   pdf:
     output-file: lab-bivariate.pdf
-
-# params:
-#   truc: html
-#   year: 2024 
-#   curriculum: "M1 MIDS & MFA"
-#   university: "Université Paris Cité"
-#   homepage: "https://s-v-b.github.io/MA7BY020"
-#   moodle: "https://moodle.u-paris.fr/course/view.php?id=6143"
 ---
 
 

@@ -1,6 +1,6 @@
 ---
-title: "Data visualization  with plotly"
-categories: [Visualization, Rosling, gapminder, ggplot2, plotly, Grammar of Graphics]
+title: "Data visualization  with plotly, using a coding assistant"
+categories: [Visualization, Rosling, gapminder, ggplot2, plotly, Grammar of Graphics, Coding assistant]
 date: "`r Sys.time()`"
 
 format:
@@ -23,6 +23,23 @@ execute:
 
 {{< include _preamble.qmd >}}
 
+
+## Objectives
+
+
+
+## Prompts (first draft)
+
+::: {.callout-important title="Prompt"}
+
+Load the gapminder package
+
+:::
+
+::: {.callout-note title="Answer"}
+
+Adding a code chunk to load the gapminder package after the preamble.
+
 ```{r}
 #| label: load-gapminder
 #| echo: true
@@ -33,6 +50,24 @@ library(plotly)
 library(ggplot2)
 ```
 
+Added a code chunk to load the gapminder package. It appears after the preamble include and will load the library when the document is rendered. The chunk is configured to echo the code and evaluate it.
+
+:::
+
+
+::: {.callout-important title="Prompt"}
+
+Using package plotly, build an animated  plot (each frame corresponding to a value in colum Year) mapping column gdpPercap to X-axis and lifeExpectancy to Y-axis 
+
+:::
+
+
+::: {.callout-note title="Answer"}
+ 
+ Creating an animated plotly plot. Checking the current file and the gapminder dataset structure.
+
+ Adding plotly and creating the animated plot 
+
 ```{r}
 #| label: animated-plot
 #| echo: true
@@ -42,9 +77,21 @@ library(ggplot2)
 # X-axis: gdpPercap, Y-axis: lifeExp, Frame: year
 (gapminder |>
   ggplot() +
-  aes(x = gdpPercap, y = lifeExp, frame = year) +
+  aes(
+    x = gdpPercap, 
+    y = lifeExp, 
+    frame = year, 
+    color = continent, 
+    size = pop, 
+    text = country) +
   geom_point(alpha = 0.6) +
   scale_x_log10() +
+  scale_size_area(
+    max_size = 15,
+    labels = scales::label_number(scale = 1/1e6, suffix = " M"),
+    guide = guide_legend(title = "Population")
+  ) +
+  guides(color = "none") +
   labs(
     x = "GDP per Capita",
     y = "Life Expectancy",
@@ -52,5 +99,160 @@ library(ggplot2)
   )) |>
   ggplotly(height = 500, width = 750)
 ```
+
+Added an animated plotly visualization:
+
+Loads required packages: plotly and ggplot2 (in addition to gapminder)
+
+Creates the animated plot with:
+
+- X-axis: gdpPercap (GDP per capita)
+- Y-axis: lifeExp (Life expectancy)
+- Frame: year (enables animation by year)
+- Log scale on the x-axis (common for GDP)
+
+Labels and title
+
+The `frame = year` aesthetic in the `aes()` call makes `plotly` animate by year. When rendered, you'll see a play button to animate through the years, showing how countries move across the GDP per capita vs. life expectancy space over time.
+
+
+:::
+
+## Second thoughts 
+
+- Metadata (FAIRness)
+- Commenting 
+  - Spelling out the message
+  - Data criticism 
+  - Improving accessibility
+  - Information released after hovering
+- Navigating the plot
+  - Using `plotly`
+  - The case for interactive dashboards
+    - `shiny`
+    - `dash`
+ 
+
+
+## Accessing gapminder metadata
+
+
+::: {.callout-important title="Prompt"}
+
+Where can I find metadata concerning the gapminder dataset?
+
+:::
+
+::: {.callout-note title="Answer"}
+
+
+Metadata about the `gapminder` dataset can be found in several places:
+
+### 1. Package documentation
+
+The most direct way to access metadata is through R's help system:
+
+```{r}
+#| label: gapminder-help
+#| eval: false
+#| echo: true
+
+# View the dataset documentation
+?gapminder
+
+# Or equivalently
+# help(gapminder)
+```
+
+### 2. Package vignettes
+
+The `gapminder` package may include vignettes with detailed information:
+
+```{r}
+#| label: gapminder-vignettes
+#| eval: false
+#| echo: true
+
+# List available vignettes
+browseVignettes("gapminder")
+
+# Or view a specific vignette
+vignette("gapminder", package = "gapminder")
+```
+
+### 3. Dataset structure and attributes
+
+You can inspect the dataset structure and any stored metadata:
+
+```{r}
+#| label: gapminder-structure
+#| echo: true
+#| eval: false
+
+# View dataset structure
+str(gapminder)
+# View attributes (may contain metadata)
+attributes(gapminder)
+# Quick overview
+tibble::glimpse(gapminder)
+```
+
+### 4. Online resources
+
+- **CRAN package page**: <https://cran.r-project.org/package=gapminder>
+- **GitHub repository**: <https://github.com/jennybc/gapminder>
+- **Original data source**: The data is based on statistics from the [Gapminder Foundation](https://www.gapminder.org/)
+
+### 5. Package description
+
+```{r}
+#| label: gapminder-package-info
+#| echo: true
+#| eval: true
+
+# Get package information
+packageDescription("gapminder")
+
+# Get package citation
+citation("gapminder")
+```
+
+:::
+ 
+This answer is mildly satisfactory. 
+But what are we expecting concerning metadata?
+
+- Data sources
+- Data quality
+- Data 
+
+[Gapminder documentation](https://www.gapminder.org/data/documentation/)
+
+[The Gapminder foundation](https://www.gapminder.org)
+
+A beautiful animation is offered on the Gapminder  foundation website. A warning concerning data quality is available.
+
+See [Blog post on this issue](https://www.gapminder.org/news/data-sources-dont-panic-end-poverty/)
+
+
+[Life Expectancy at Birth Gapminder data](https://www.gapminder.org/data/documentation/gd004/)
+
+
+[SDMX]()
+
+[DDF Model](https://open-numbers.github.io/ddf.html)
+
+[DDFQL]()
+
+### Knowledge graphs
+
+
+## Playing with the palette
+
+
+##
+
+
+## The case for interactive dashboards
 
 
