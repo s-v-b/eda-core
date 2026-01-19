@@ -1857,10 +1857,34 @@ See [pipes for beginners](https://www.r-bloggers.com/2017/12/pipes-in-r-tutorial
 
 
 
+# Pandas (Python) versus `R` dataframes : in words {background-color="#1c191c"}
+
+## 
+
+The document [Comparison with R in Pandas documentation](https://pandas.pydata.org/docs/getting_started/comparison/comparison_with_r.html)
+is somewhat outdated, yet, it remains useful.
+
+In a single package, through classes `DataFrame`  and `Series`, Pandas covers things that are handled by a collection of packages in `R` :
+
+- Querying (`dplyr`, `dtplyr`, `dbplyr`)
+- Reshaping  (`tidyr`)
+- Summary statistics (`skimr`)
+- Bridging with graphical backends (`ggplot2`)
+- Table display (`gt`)
+- Readers and writers (`readr`, `readxl`, ...)
+- ...
 
 
+## Tidy selection and tidy evaluation
+
+Thanks to *tidy evaluation*, `R` programmers can avoid quoting column names.
+Some programmers like it that way. 
 
 
+## Near future 
+
+Pandas (up to 2.xx) has not been praised for its treatment of strings and missing data. This is changing 
+with the [Arrow revolution](https://pandas.pydata.org/docs/user_guide/pyarrow.html) and [Pandas 3.0](https://pandas.pydata.org/docs/user_guide/migration-3-strings.html)
 
 
 # The End   {background-color="#1c191c"}
