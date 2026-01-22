@@ -1242,7 +1242,7 @@ q <- filter(gapminder, FALSE) |>
 
 
 (
-  (p %+% gapminder) +
+  (q %+% gapminder) +
   facet_null() +
   aes(frame=year)
 ) |>
@@ -1250,6 +1250,18 @@ q <- filter(gapminder, FALSE) |>
 
 ```
 
+
+
+```{r}
+
+(
+  (q %+% filter(gapminder, continent=='Europe')) +
+  facet_null() +
+  aes(frame=year)
+) |>
+ plotly::ggplotly(height = 500, width=750)
+
+```
 :::
 
 :::

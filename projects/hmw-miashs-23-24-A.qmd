@@ -1,11 +1,12 @@
 ---
 date: "`r Sys.time()`"
+draft: true
 
 execute:
   echo: true
   eval: true
   collapse: true
-draft: true
+
 
 format:
   html:
@@ -15,7 +16,6 @@ format:
 
 
 
-draft: true
 engine: knitr
 ---
 

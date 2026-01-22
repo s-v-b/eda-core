@@ -15,7 +15,6 @@ format:
   pdf:
     output-file: hmw-dev-2025.pdf
 
-draft: false
 prefer-html: true
 ---
 

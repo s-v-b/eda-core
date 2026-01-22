@@ -15,7 +15,7 @@ format:
   pdf:
     output-file: hmw-votes-2025.pdf
 
-draft: false
+
 prefer-html: true
 ---
 

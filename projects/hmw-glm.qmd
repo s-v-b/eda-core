@@ -16,7 +16,6 @@ format:
   pdf:
     output-file: hmw-glm-2024.pdf
 
-draft: true
 standalone: true
 prefer-html: true
 ---

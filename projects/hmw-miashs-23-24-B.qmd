@@ -15,8 +15,6 @@ format:
     output-file: hmw-miashs-23-24-b.pdf
 
 
-
-draft: true
 engine: knitr
 ---
 

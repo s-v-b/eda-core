@@ -1,0 +1,177 @@
+---
+title: "Hmw II : Tables and visualization"
+date: "2025-05-11"
+
+execute:
+  echo: true
+  eval: false
+  collapse: true
+
+format:
+  html:
+    output-file: hmw-II.html
+  pdf:
+    output-file: hmw-II.pdf
+
+draft: false
+prefer-html: true
+
+# engine: jupyter
+engine: knitr
+---
+
+::: {.callout-important}
+
+- Due : May 29, 2025
+- Work in pairs
+- Deliver your work as a `qmd` file through a github {{< fa brands github >}} repository
+- Use the `quarto` package for reproducible research
+- Use `pyspark` or `sparlyr`
+- Use `spark-nlp` for text annotation 
+- The report should be rendered at least in HTML format, and possibly also in PDF format
+
+:::
+
+### {{< fa map >}} Objectives
+
+This homework is an opportunity to use `pyspark`/`sparlyr`/`spark-nlp`.
+
+- Extract/Load/Transform the Balzac corpus
+- Annotate the corpus with `spark-nlp`
+- Perform Stylometric Analysis and Visualize the results using either `plotly` or `altair`
+- Design a way to store results using `parquet` files. Motivate your solution.
+
+Compare annotations from Spark NLP and annotations from Spacy (usability, agreement).  
+
+In Stylometric analysis, you should at least 
+
+- Compute Flesch-Kincaid and Kandel-Moles readability indices and design a visualization
+- Compute *sliding* readability indices over sliding windows defined by 
+  different window sizes. How stable are readability indices? 
+- Display Zipf plots for the different documents
+- Segment the different texts into *dialog* and *narration* parts.
+
+
+Tune your spark session so as to minimize shuffles, use multi-core architectures as much as possible.
+
+{{< fa hand-point-right >}} Your deliverable shall consist in a `qmd` file that can be rendered in HTML format.
+
+You shall describe the downloaded data.
+
+Plots shall be endowed with titles, legends and captions,
+
+Data, NLP  pipelines and graphical pipelines shall be given in an appendix.
+
+### {{< fa database >}} Data
+
+
+
+
+::: {.columns}
+
+::: {.column width="60%"}
+
+Data can be downloaded/scrapped from different sources 
+
+- <https://github.com/dh-trier/balzac/tree/master>  (not complete)
+- <https://www.gutenberg.org/> (17 volumes of *Comédie humaines*)
+- ...
+
+
+:::
+
+::: {.column width="5%"}
+
+:::
+
+::: {.column width="35%"}
+
+{{< fa hand-point-right >}} Table wrangling should be performed using  `Spark Dataframes` Dataframes.
+
+{{< fa hand-point-right >}} Your extraction (ELT) pipeline shall be *reproducible* and shall be given and motivated in an appendix. 
+
+You are not supposed to deliver the text files as a zipped archive. 
+
+{{< fa hand-point-right >}} Annotate with [`soark-nlp`](https://sparknlp.org)
+
+{{< fa hand-point-right >}} Annotation shall be done 
+on a per novel basis. It should be performed in a parallel (and distributed) way. 
+
+{{< fa hand-point-right >}} Graphical pipelines should be reproducible and shall be given in an appendix.
+
+:::
+:::
+
+{{< fa hand-point-right >}} Keep the downloaded data in a separate subdirectory. Your working directory (working tree) should look like something like that:
+
+```{verbatim}
+.
+├── .git/
+├── DATA/
+├──
+|   :
+├── _extensions/
+├── _outdir/
+├── _metadata.yml
+├── _quarto.yml
+├── our_report.qmd
+├── :
+└── README.md
+```
+
+
+
+
+## {{< fa chart-bar >}} Report organization
+
+The first part  (introduction) of the report shall be dedicated to the description of the data to be extracted and to the extraction pipeline (not different from Homework I). 
+
+The second part of the report shall be dedicated to the description of load/transform pipeline. 
+
+The third part of the report  shall be dedicated  to the description of the annotation pipeline
+
+The fourth part of the  report shall be dedicated to the stylometric analysis: which questions did you pick up (and why?), plots, summary tables  and comments. Refrain from overplaying your hand: yours plots are not likely to provide a new literary interpretation of Balzac opera. Comment the data, all the data, and nothing but the data.
+
+The fifth part is the appendix. The first four parts should be mostly text and plots. The fifth part should be code only.
+
+The appendix shall be dedicated to the details of the pipelines. You shall give the code. 
+
+You shall also give the code of the graphical pipelines in the appendix.
+
+You shall avoid copy-paste coding. Don't Repeat Yourself. `knitr` provide the tools to organize the Quarto file so that you can write your code once and use it many times, once for data wrangling and plotting (without echoing), then for listing and explanation.
+
+::: {.callout-tip}
+
+### Organizing a report using the `jupyter` engine
+
+:::
+
+## {{< fa book >}} References
+
+- [Data Humanities with R](https://humanitiesdata.org)
+- [Spacy](https://spacy.io)
+- [Spark NLP](https://sparknlp.org)
+- [Web scrapping]()
+- [`scrapy`](https://scrapy.org) 
+- [`stylo`](https://github.com/computationalstylistics/stylo)  
+- [`py2r`](https://rpy2.github.io)
+- [Computational stylistics](https://computationalstylistics.github.io)
+
+## Data sources
+
+- [`Project Gutenberg`](https://www.gutenberg.org): you can find the `La Comédie Humaine` using a simple search. All volumes can be downloaded as text files from there.  
+
+## {{< fa graduation-cap >}} Grading criteria
+
+
+
+| Criterion | Points  | Details |
+|:----------|:-------:|:--------|
+|Narrative, spelling and syntax | `r scales::label_percent()(4/20)` | English/French {{<  fa pen-fancy >}}|
+|Plots correction | `r scales::label_percent()(3/20)` | choice of `aesthetics`, `geom`, `scale` ... {{<  fa chart-area >}}|
+|Plot style | `r scales::label_percent()(2/20)` | Titles, legends, labels, breaks ... {{<  fa chart-area >}} |
+|ETL  | `r scales::label_percent()(4/20)` | ETL, SQL like manipulations {{<  fa database >}} |
+|Annotation |  `r scales::label_percent()(2/20)` | Annotations {{<  fa book >}} ||
+|Computing Statistics | `r scales::label_percent()(1/20)` |  ... {{<  fa chart-area >}} |
+|DRY compliance | `r scales::label_percent()(4/20)` | DRY principle at {{<  fa brands  wikipedia-w  >}} [ Wikipedia ](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)|
+
