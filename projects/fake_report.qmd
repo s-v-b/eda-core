@@ -3,7 +3,7 @@ title: "LAB: Fake report"
 format:
   html:
     output-file: fake-report.html
-draft: true
+draft: false
 
 execute: 
   eval: true
@@ -44,8 +44,33 @@ lorem::ipsum()
 ```
 
 
+# Reproducible data gathering 
+
+
+Data and metadata should be retrieved programmatically. 
+
+Here is an example from the [OECD API documentation](https://www.oecd.org/en/data/insights/data-explainers/2024/09/api.html). Other providers have their own API for example [Eurostat](https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-getting-started#SDMX2.1). 
+
+```{r}
+#| label: oecd-api
+#| echo: true
+#| appendix: false
+#| 
+url <- "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI/.M.LI...AA...H?startPeriod=2023-02&dimensionAtObservation=AllDimensions&format=csvfilewithlabels"
+
+df <-  read.csv(url)
+
+df |>
+  dplyr::select(sample(seq(1,30), size=10)) |>
+  tibble::glimpse(width=30)
+```
+
+{{< fa hand-point-right >}} Note that in your report, data gathering chunks should go to the appendix. 
+
+
 # 200 countries, 50 years, 20 lines of code
 
+You should build your report and your presentation around plots and tables.
 
 ```{r}
 #| ref.label: lorem
@@ -53,18 +78,47 @@ lorem::ipsum()
 
 ```{r}
 #| label: load_gapminder 
+#| appendix: true
+
+# Load the data
+#
 gapminder <- gapminder::gapminder
+```
 
+{{< fa hand-point-right >}} Display tables with style  (no kitsch please).
+
+```{r}
+#| label: display_gapminder
+#| appendix: true 
+
+#
+#
+# Using package gt 
+#
 gapminder |>
-    head() |>
-    knitr::kable()
-
+  dplyr::slice_sample(n=2, by= continent) |>
+  dplyr::mutate(pop=pop/1e6) |>
+  gt::gt() |>
+  gt::fmt_number(columns=c(pop, lifeExp),decimals=1)|>
+  gt::fmt_currency(columns=gdpPercap, use_subunits=FALSE) |>
+  gt::cols_label(
+    country = "Country",
+    continent = "Continent",
+    year = "Year",
+    lifeExp = "Life Expectancy",
+    pop = "Population (Millions Inhab.)", 
+    .fn =  stringr::str_to_title
+    )
 ```
 
 
 ```{r}
 #| label: theme_scale
 #| appendix: true
+#
+#
+# A neater color scale 
+#
 neat_color_scale <-
       c("Africa" = "#01d4e5",
         "Americas" = "#7dea01" ,
@@ -78,9 +132,13 @@ neat_color_scale <-
 #| ref.label: lorem
 ```
 
+{{< fa hand-point-right >}} Visualization matters
+
 ```{r}
 #| label: visualize_static_gapminder 
 #| appendix: true
+#
+#
 a_year <- sample(gapminder$year, 1)
 
 p <- gapminder |>
@@ -114,6 +172,8 @@ p
 #| ref.label: lorem
 ```
 
+{{< fa hand-point-right >}} Interaction and animation shine 
+ 
 ```{r}
 #| label: static-plotly
 #| appendix: true
@@ -143,7 +203,11 @@ p
 ```
 
 
+
 # Appendix 
+
+
+{{< fa hand-point-right >}} The appendix should contain the code that helped you create the document
 
 ```{r}
 #| ref.label: lorem

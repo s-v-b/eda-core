@@ -2,7 +2,7 @@
 title: "Hmw I : Tables and visualization"
 date: "2026-01-26"
 
-draft: true
+draft: false
 engine: knitr
 ---
 
@@ -10,31 +10,36 @@ engine: knitr
 
 - Due : March 7, 2026
 - Work in pairs
-- Deliver your work as a `qmd` file through a github {{< fa brands github >}} repository  (your github repository should be organized and named accoring to the [rules]())
-- Use the `quarto` package for reproducible research
-- The report should be rendered at least in HTML format, and possibly also in PDF format
+- Deliver your work as  `qmd` files through a github {{< fa brands github >}} repository  (your github repository should be organized and named accoring to the [rules](https://github.com/s-v-b/tmpl_project_rep))
+- Use the `quarto` package for reproducible research  (see [Projects](/projects-listings.qmd))
+- I should be able to render the report and presentation at least in HTML format
 
 :::
 
 ### {{< fa map >}} Objectives
 
-This homework is dedicated to table wrangling and visualization.
+This homework is dedicated to table wrangling and visualization. You will choose data from 
+public sources, for example:
 
-[OECD](https://data.oecd.org), [Eurostat]() offer detailed statistics at different territorial levels.
-[Our World in Data](https://ourworldindata.org)
-[World Bank](https://data.worldbank.org)
+- [OECD](https://data.oecd.org), 
+- [Eurostat](https://ec.europa.eu/eurostat/data) and [Eurostat database](https://ec.europa.eu/eurostat/data/database)
+- [Our World in Data](https://ourworldindata.org)
+- [World Bank](https://data.worldbank.org)
+- ... 
 
 
-Using data gathered from [OECD](https://data.oecd.org), build  dataframes with a gapminder-like schema (territorial units/timestamps as  keys, statistics for other columns). Using `ggplot2` and `plotly`, design plots and  animations like the \[Rossling address to BBC\](). Display 
+Using data gathered from those public sources, build  dataframes with a gapminder-like schema (territorial units/timestamps as  keys, statistics for other columns). Using `ggplot2` and `plotly`, design plots and  animations like the \[Rossling address to BBC\](). Display 
 tables using package `gt` (or any other nice competing tool)
 
-Your data and graphical pipelines should be designed so that they can be at least partially reused to perform gapminder-like animations with other kind of data gathered from OECD. For example one, could replace life expectancy at birth by life expectancy at 60, infant mortality, or any other health index. One could replace GDP per capita with social expenditure per capita, or something like that.
+Your data and graphical pipelines should be designed so that they can be at least partially reused to perform gapminder-like animations with other kind of data gathered from public sources. For example one, could replace life expectancy at birth by life expectancy at 60, infant mortality, or any other health index. One could replace GDP per capita with social expenditure per capita, or something like that.
 
-Your deliverable shall consist in a `qmd` file that can be rendered in HTML format.
+Any reader should be able to retrieve the data and metadata from the public sources using your pipeline. This is necessary if your study aims at checkability and reproducibility.   
+
+Your deliverable shall consist in a `qmd` file (for report, for presentation) that can be rendered in HTML format.
 
 You shall describe the downloaded data.
 
-Plots shall be endowed with titles, legends and captions,
+Plots shall be endowed with titles, legends and captions. Plot comments should not boil down to AI generated trivialities.
 
 Data pipelines and graphical pipelines shall be given in an appendix.
 
@@ -48,7 +53,7 @@ Data have to be downloaded from <https://data.oecd.org> (the old site <https://s
 Use [OECD Data explorer](https://www.oecd.org/en/data/datasets/oecd-DE.html) to find the data you need.
 Follow the guidleines given in the [OECD Data Explorer API](https://data.oecd.org/api/sdmx-json-documentation/).
 
-{{< video "https://www.youtube.com/watch?v=AizMXcgvbvQ&t=10s" >}}
+{{< video "https://www.youtube.com/watch?v=ljyDrj-Fi1s" >}}
 
 :::
 
@@ -87,6 +92,7 @@ Once you have decided which data you need, you shall build an extraction pipelin
 ├── _metadata.yml
 ├── _quarto.yml
 ├── my_report.qmd
+├── my_presentation.qmd
 ├── :
 └── README.md
 ```
@@ -104,7 +110,7 @@ The third part is the appendix. The first two parts should be text and plots onl
 
 The appendix shall be dedicated to the description of the data wrangling pipeline. You shall give the code. 
 
-You shall also give the code of the graphical pipelines in the appendix.
+You shall also give the code of the table and graphical pipelines in the appendix.
 
 You shall avoid copy-paste coding. Don't Repeat Yourself. The `tidyverse` is your friend. `knitr` provide the tools to organize the Quarto file so that you can write your code once and use it many times, once for data wrangling and plotting (without echoing), then for listing and explanation.
 
@@ -114,7 +120,7 @@ You shall avoid copy-paste coding. Don't Repeat Yourself. The `tidyverse` is you
 
 Look at [fake report](/core/projects/fake_report.qmd) organized along this principles. Note that works with the `knitr` engine.
 
-Have a look at [Rmarkdown the definitive guide](https://bookdown.org/yihui/rmarkdown/) to leanr about `knitr` tricks.
+Have a look at [Rmarkdown the definitive guide](https://bookdown.org/yihui/rmarkdown/) to learn about `knitr` tricks (this works with `quarto` provided tou use the `knitr` engine).
 
 This trick is described in [Section 4.19](https://bookdown.org/yihui/rmarkdown-cookbook/code-appendix.html)
 
