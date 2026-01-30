@@ -2,6 +2,8 @@
 title: 'LAB: Univariate analysis'
 date: "`r Sys.time()`"
 draft: false 
+resources: "/DATA/Recensement.csv"
+
 
 execute:
   echo: true
@@ -25,11 +27,11 @@ format:
 
 # Univariate numerical samples
 
-```{r setup-packages}
+```{r}
 #| warning: false
 #| message: false
 #| collapse: true
-#| label: setup
+#| label: setup-packages
 #| 
 to_be_loaded <- c("tidyverse", 
                   "magrittr",
@@ -76,9 +78,10 @@ For categorical samples/columns, we have:
 # Dataset
 
 
-> Since 1948, the US Census Bureau  carries out a monthly Current Population Survey, 
+> Since 1948, the [US Census Bureau](https://www.census.gov)  carries out a monthly [Current Population Survey](https://www.census.gov/programs-surveys/cps.html), 
 collecting data concerning residents aged above 15  from $150 000$ households. 
 This survey is one of the most important sources of information concerning the american workforce. Data reported in file `Recensement.txt`  originate from the 2012 census. 
+
 
 In this lab, we investigate the numerical colums of the dataset.
 
@@ -101,7 +104,7 @@ getwd()
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="Solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| mesage: false
@@ -122,12 +125,38 @@ if (!fs::file_exists("./DATA/Recensement.csv")) {
 
 df <- readr::read_table("./DATA/Recensement.csv")
 
-df %>% 
+df |> 
   glimpse()
 ```
 
 :::::
 
+::: {.callout-tip title="solution cont'd" collapse="true"}
+
+A byproduct of `readr::read_table` default behavior is the display 
+of the (guessed) table schema. If we want to store this tentative table schema, we can use `readr::spec_table()`. 
+
+```{r}
+#| eval: false
+df_schm <- readr::spec_table("./DATA/Recensement.csv")
+```
+
+Have a look at object `df_schm`. Is it a list? What are the list component.
+
+The next time we will load `Recensement`, we want `SEXE` and `NIV_ETUDES` to be handled as  factors. We can tweak the guessed schema and use it to reload 
+the dataframe  using the optional `col_types` argument. 
+
+```{r}
+#| eval: false
+df_schm$cols$SEXE <- readr::col_factor(levels=c("F", "M"))
+df_schm$cols$NIV_ETUDES <- readr::col_factor(levels= df|> pull(NIV_ETUDES) |> unique() |> as.character())
+
+df <- readr::read_table("./DATA/Recensement.csv",   
+                        col_types = df_schm) 
+```
+
+
+:::
 :::
 
 # Table wrangling
@@ -148,21 +177,22 @@ Let us attempt to base the decision on a checkable criterion: determine  the num
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: to-be-categorized
-to_be_categorized  <- df %>% 
-  summarise(across(everything(), n_distinct)) %>% 
+to_be_categorized  <- df |> 
+  summarise(across(everything(), n_distinct)) |> 
   pivot_longer(cols = everything(), 
                # names_to = "nom_colonne",
-               values_to = c("n_levels")) %>% 
-  filter(n_levels < 20) %>% 
+               values_to = c("n_levels")) |> 
+  filter(n_levels < 20) |> 
   arrange(n_levels) 
 
-to_be_categorized
+to_be_categorized |> 
+  gt::gt()
 
-to_be_categorized %>% 
+to_be_categorized |> 
   pull(name)
 ```
 
@@ -178,7 +208,7 @@ Coerce the relevant columns as factors.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 We could proceed by iteration over the relevant columns. We 
 use `lobstr::...` to monitor the copy on modify process. 
@@ -197,28 +227,34 @@ for (cl in pull(to_be_categorized,name)) {
 }
 
 lobstr::obj_addr(df_copy)
-foo <- lobstr::ref(df_copy)
+
+lobstr::ref(df_copy)
 ```
+
+Note that some of the elements of dataframe `df_copy` still 
+refer to the objects referred  by elements of dataframe `df` (`SAL_HORAIRE` and `AGE`).  
+
 
 :::
 
-::::: {.callout-note title="solution (cont'd)" collapse="true"}
+::::: {.callout-tip title="solution (cont'd)" collapse="true"}
  
 We will kill several birds with one stone.
 
-`across()` allows us to  pick  the columns to be categorized, to 
+`across()`  allows us to  pick  the columns to be categorized, to 
 apply `as_factor()` to each of them, and to replace the old column 
-by the result of `as_factor(....)`  
+by the result of `as_factor(....)`. `across()` allows us to perform 
+`tidy_selection`  while using verb `mutate`.   
 
 ```{r}
 #| collapse: true
 #| label: tidy-selet-mutate
-df_cp <- df %>% 
+df_cp <- df |> 
   mutate(across(all_of(pull(to_be_categorized, name)), as_factor))
 
 lobstr::ref(df_cp)
 
-df %>% 
+df |> 
   glimpse()  
 ```
 
@@ -227,7 +263,7 @@ We could do this using the WET approach
 ```{r}
 #| eval: false
 #| label: wet
-df_wet <- df %>% 
+df_wet <- df |> 
   mutate(SEXE = as_factor(SEXE), 
          SYNDICAT = as_factor(SYNDICAT), 
          REGION = as_factor(REGION), 
@@ -239,7 +275,7 @@ df_wet <- df %>%
          REV_FOYER = as_factor(REV_FOYER)
   ) 
 
-df_wet %>% 
+df_wet |> 
   glimpse()
 ```
 
@@ -271,22 +307,22 @@ Useful functions:
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: kable-summarise
-df %>% 
-  is.na() %>% 
-  as_tibble %>% 
-  summarise(across(everything(), sum))  %>%
-  knitr::kable()
+df |> 
+  is.na() |> 
+  as_tibble() |> 
+  summarise(across(everything(), sum))  |>
+  gt::gt()
 ```
 
 or 
 
 ```{r}
 #| label: anonymnous-function
-df %>% 
+df |> 
   summarise(across(everything(), \(x) sum(is.na(x)))) 
 ```
 
@@ -294,7 +330,7 @@ or
 
 ```{r}
 #| label: formulae
-df %>% 
+df |> 
   summarise(across(everything(), ~ sum(is.na(.)))) 
 ```
 
@@ -313,12 +349,12 @@ Note the different ways of introduction anonymous functions.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="false"}
+::::: {.callout-tip title="solution" collapse="false"}
 
 ```{r}
 #| label: summary-age
-df %>% 
-    pull(AGE) %>% 
+df |> 
+    pull(AGE) |> 
     summary()
 
 sd(df$AGE) ; IQR(df$AGE) ; mad(df$AGE)
@@ -333,18 +369,18 @@ Use `skimr::skim()`
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: skim-age
-df %>% 
-    pull(AGE) %>% 
+df |> 
+    pull(AGE) |> 
     skimr::skim()
 ```
 
 ```{r}
 #| label: milk-skim
-skm <- df %>% 
+skm <- df |> 
   skimr::skim(AGE)
 
 class(skm)
@@ -370,9 +406,9 @@ Are mean and median systematically related?
 
 ::: {.content-visible when-profile="solution" collapse="true"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
-Ask chatgpt.
+Ask the bot.
 
 There is at least one relation between median and mean for square-integrable distributoins:
 $$|\text{Median} - \text{Mean}| \leq \text{sd}$$
@@ -390,9 +426,9 @@ Are standard deviation and IQR systematically related ?
 
 ::: {.content-visible when-profile="solution" collapse="true"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
-Ask chatgpt.
+Ask the bot.
 
 Yes. 
 
@@ -410,11 +446,11 @@ Draw a boxplot of the Age distribution
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: boxplot-age
-df |> 
+p <- df |> 
     ggplot() +
     aes(x=1L, y=AGE) +
     geom_boxplot() +
@@ -422,6 +458,8 @@ df |>
         title="Age distribution",
         subtitle = "Census data"
     )
+
+p
 ```
 
 :::::
@@ -436,11 +474,21 @@ How would you get rid of the useless ticks on the x-axis?
 
 ::: {.content-visible when-profile="solution" collapse="true"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
-Ask chatgpt.
+Ask the bot (*In a boxplot built using ggplot2, how can I get rid from the ticks on the x axis?*).
 
-Yes. 
+Yes. This is a matter of `theme`.
+
+
+```{r}
+p +
+  theme(
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank()
+  )
+```
+
 
 :::::
 
@@ -456,7 +504,7 @@ Plot a _histogram_ of the empirical distribution of the `AGE` column
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: histogram-age
@@ -506,7 +554,7 @@ Plot a _density_ estimate of the `AGE` column (use `stat_density`.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: age-density
@@ -538,7 +586,7 @@ Overlay the two plots  (histogram and density).
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: age-density-histogram
@@ -572,7 +620,7 @@ Plot the Empirical CDF of the AGE distribution
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: age-ecdf
@@ -595,7 +643,7 @@ Can you read the quartiles from the ECDF pplot?
 
 ::: {.content-visible when-profile="solution" collapse="true"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 Of course. Yes, we can.
 
@@ -615,11 +663,11 @@ Plot the quantile function of the AGE distribution.
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: salaire-generic
-p <- df %>% 
+p <- df |> 
   ggplot() +
   aes(x=SAL_HOR) +
   labs(
@@ -652,7 +700,7 @@ p +
 
 ::: {.content-visible when-profile="solution"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 ```{r}
 #| label: sal-hor-density-histo
@@ -710,7 +758,7 @@ How could you comply with the DRY principle ?
 
 ::: {.content-visible when-profile="solution" collapse="true"}
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 This amounts to [programming with `ggplot2`](https://ggplot2-book.org/programming) function. This is not straightforward since `ggplot2` relies on data masking. 
 
@@ -724,7 +772,7 @@ From [Hadley Wickham](https://ggplot2-book.org/programming)
 
 
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
 An attempt: 
 
@@ -757,24 +805,26 @@ mp
 :::::
 
 
-::::: {.callout-note title="solution" collapse="true"}
+::::: {.callout-tip title="solution" collapse="true"}
 
-Another attempt
+Another attempt. This delivers a list of histogram plots, one for each 
+numeric column. 
 
 ```{r}
-##| file: "UTILS/my_histo.R"
+#| file: "UTILS/my_histo.R"
 #| echo: true
 #| eval: true
 ```
 
+Have a look at the call to `my_histo()`. How is the column passed to the aesthetic mapping? How is the ellipsis `...` used?   
 
 ```{r}
-#| eval: false
+#| eval: true
 list_plots <- df_cp |> 
   select(where(is.numeric)) |> 
   colnames() |> 
   map(rlang::parse_expr) |>
-  map (\(x) my_histo(df, {{x}}))
+  map (\(x) my_histo(df, {{x}}, bins=30))
 
 patchwork::wrap_plots(list_plots)
 ```

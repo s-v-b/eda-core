@@ -691,7 +691,7 @@ flights |>
 
 :::
 
-- Which flights travelled the farthest? 
+- Which flights traveled the farthest? 
 
 
 ::: {.callout-note collapse="true"}
@@ -719,7 +719,7 @@ flights |>
 
 :::
 
-- Which travelled the shortest?
+- Which **traveled** the shortest?
 
 ::: {.content-visible when-profile="solution"}
 
@@ -1174,6 +1174,13 @@ flights |>
 
 ::: {.callout-tip title="Solution" collapse="true"}
 
+```{r}
+flights |>
+  filter(!is.na(arr_delay)) |>
+  ggplot() +
+    aes(x=dep_delay, y=arr_delay) +
+    geom_point(alpha=.1)
+```
 :::
 
 :::
@@ -1404,7 +1411,9 @@ flights |>
     summarise(m = sum(arr_delay, na.rm = T)) |> 
     arrange(desc(m)) |> 
     rename(faa=dest) |>
-    dplyr::inner_join(airports)
+    dplyr::inner_join(airports) |>
+    head() |>
+    gt::gt()
 ```
 
 :::
@@ -1425,16 +1434,25 @@ WITH R AS (
   WHERE arr_delay >0
   GROUP BY ROLLUP(dest, flight)
 )
+
 SELECT r1.dest, r2.flight, r2.sum/r1.sum AS rap
-FROM (SELECT dest, sum 
-      FROM R WHERE flight IS NULL) r1 
-      JOIN R r2 
-      ON (r1.dest=r2.dest)
+FROM 
+  (SELECT dest, sum 
+   FROM R 
+   WHERE flight IS NULL) r1 
+  JOIN 
+   R r2 
+  ON (r1.dest=r2.dest)
 WHERE r2.flight IS NOT NULL AND r2.sum/r1.sum >.1
 ORDER BY r1.dest, r2.flight ;
 ```
 
 With `WINDOW` it is even easier
+
+
+```{.sql}
+
+```
 
 :::
 
@@ -1478,13 +1496,16 @@ WITH R AS (
          flight, 
          SUM(arr_delay)  AS  total_delay_per_flight
   FROM flights
-WHERE arr_delay > 0 
-GROUP BY dest, flight
+  WHERE arr_delay > 0 
+  GROUP BY dest, flight
 ) 
-SELECT dest, flight, 
-       total_delay_per_flight, 
-       SUM(total_delay_per_flight) OVER w_per_dest AS     total_delay_per_dest 
-FROM R
+
+SELECT 
+  dest, flight, 
+  total_delay_per_flight, 
+  SUM(total_delay_per_flight) OVER w_per_dest AS total_delay_per_dest 
+FROM 
+  R
 WINDOW w_per_dest AS (PARTITION BY dest) ;
 ```
 

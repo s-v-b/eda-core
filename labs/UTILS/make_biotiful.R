@@ -9,13 +9,13 @@ make_biotifoul <-  function(df, .f=is.factor, .bins=30){
     .scales <- "free_x"
   } 
 
-  p <- df %>%
-    select(where(.f)) %>%
+  p <- df |>
+    select(where(.f)) |>
     pivot_longer(
       cols = everything(),
       names_to = "var",
       values_to = "val"
-    ) %>%
+    ) |>
     ggplot() +
     aes(x = val) +
     facet_wrap(~var, scales=.scales) + 
@@ -23,7 +23,7 @@ make_biotifoul <-  function(df, .f=is.factor, .bins=30){
   
   if(identical(.f, is.factor)){
     p + 
-    geom_bar(fill=alpha("black",.9)) + 
+    geom_bar(fill=alpha("grey",.5)) + 
     geom_text(
       aes(
         label = sprintf(
@@ -35,7 +35,11 @@ make_biotifoul <-  function(df, .f=is.factor, .bins=30){
     )
   } else {
     p + 
-    geom_histogram(aes(y=after_stat(density)), bins=.bins) + 
+    geom_histogram(
+      aes(y=after_stat(density)),
+      colour=alpha("black",.5),
+      fill=alpha("grey",.5),
+      bins=.bins) + 
     xlab("")
   }
 }
