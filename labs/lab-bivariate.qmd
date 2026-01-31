@@ -1,6 +1,6 @@
 ---
 title: 'Bivariate analysis'
-categories: [Bivariate analysis, Boxplots, Pairplots]
+categories: [Bivariate analysis, Boxplots, Pairplots, Mosaicplots, Correlations, Chi-square]
 date: "`r Sys.time()`"
 resources: 
   - "/core/DATA/Recensement.csv"

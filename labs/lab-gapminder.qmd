@@ -1223,7 +1223,8 @@ q <- filter(gapminder, FALSE) |>
 
 
 (q %+% gapminder) |>
-  plotly::ggplotly(height = 500, width=750)   
+  plotly::ggplotly(height = 500, width=750) 
+
 ```
 1. `text` will be used while *hovering*
 2. `frame` is used by `plotly` to drive the animation. One `frame` per year
@@ -1253,6 +1254,7 @@ q <- filter(gapminder, FALSE) |>
 
 
 ```{r}
+#| eval: !expr knitr::is_html_output()
 
 (
   (q %+% filter(gapminder, continent=='Europe')) +
