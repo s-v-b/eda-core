@@ -1,0 +1,124 @@
+---
+title: "Tables manipulation II: window functions "
+categories: [Tables, tibbles, dplyr, slider, SQL, Relational Algebra, nycflights13]
+
+execute:
+  echo: true
+  eval: true
+  collapse: false
+
+format:
+  html:
+    output-file: lab-tables-slider.html
+    code-fold: true
+  pdf:
+    output-file: lab-tables-slider.pdf
+
+draft: true
+engine: knitr
+---
+
+
+
+{{< include _preamble.qmd >}}
+
+
+::: {.callout-important}
+
+### Objectives
+
+The aim of this lab is to showcase the capabilities of `dplyr` and `slider` to handle window queries on tables. In `R`, tables are basically handled as data frames. Provides a lot of tools to handle data frames. `dplyr` should be thought as a concise and consistent API for performing table calculus (the so-called *relational algebra* from database theory). `dplyr` offers *verbs* that implement the main operations of relational algebra: *projection*,  *selection*,  *joins*,  *grouping*, and *aggregation*. `slider` offers the ability to tune window management, compute 
+moving averages and aggregates with respect to complex windows. This is an essential part of time series analysis.    
+
+
+
+
+:::
+
+
+
+## Setup
+
+We will use the following packages. If needed, we install them. 
+```{r}
+#| label: setup-packages
+#| message: false
+#| warning: false
+#| include: false
+stopifnot(
+  require(lobstr),
+  require(ggforce),
+  require(nycflights13),
+  require(patchwork), 
+  require(glue),
+  require(viridis), 
+  require(tidyverse),
+  require(slider)
+)
+
+
+```
+
+
+```{r}
+old_theme <- theme_set(theme_minimal())
+```
+
+Check [nycflights13](https://nycflights13.tidyverse.org) for any explanation concerning the tables and their columns. 
+
+## Data loading 
+
+We will use data  from package `nycflights13`. Those data consist of five tables.  
+
+```{r}
+flights <- nycflights13::flights
+weather <- nycflights13::weather
+airports <- nycflights13::airports
+airlines <- nycflights13::airlines
+planes <- nycflights13::planes
+```
+
+## Comparing flights delays with flights delays during the preceding hour
+
+
+Delays are typically temporally correlated: even once the problem that caused the initial delay has been resolved, later flights are delayed to allow earlier flights to leave. Using `lag()`, explore how the delay of a flight is related to the delay of the immediately preceding flight.
+
+::: {.content-visible when-profile="solution"}
+
+::: {.callout-tip title="Solution" collapse="true"}
+
+:::
+
+:::
+
+
+## Detecting abrupt changes
+
+Our aim is to detect *abrupt changes* in departure delays occurring at 
+some airport. 
+
+Definition of abrupt changes. 
+
+Expect result 
+
+
+::: {.content-visible when-profile="solution"}
+
+::: {.callout-tip title="Solution" collapse="true"}
+
+:::
+
+:::
+
+
+## References
+
+
+- [Data transformation cheatsheet](https://rstudio.github.io/cheatsheets/html/data-transformation.html)
+- [R4Data Science Tidy](https://r4ds.had.co.nz/tidy-data.html#tidy-data-1)
+- [Benchmarking](https://h2oai.github.io/db-benchmark/)
+- [`dplyr` and `vctrs`](https://www.tidyverse.org/blog/2020/04/dplyr-1-0-0-and-vctrs/)
+- [Posts on `dplyr`](https://www.tidyverse.org/tags/dplyr/)
+- [Window functions on `dplyr`](https://dplyr.tidyverse.org/articles/window-functions.html)
+- [`slider`](https://slider.r-lib.org/index.html)
+- [`slider` vignette](https://cran.r-project.org/web/packages/slider/vignettes/slider.html)

@@ -2,7 +2,9 @@
 title: 'Bivariate analysis'
 categories: [Bivariate analysis, Boxplots, Pairplots]
 date: "`r Sys.time()`"
-
+resources: 
+  - "/core/DATA/Recensement.csv"
+  - "/core/DATA/Recensement.parquet"
 
 execute:
   echo: true
@@ -48,7 +50,8 @@ stopifnot(
   require(corrr),
   require(gapminder),
   require(slider),
-  require(tidyverse) 
+  require(tidyverse), 
+  require(gt)
 ) 
 
 ```
@@ -159,7 +162,9 @@ tb <- df |>
 tb2 <- df |>
   count(CATEGORIE, SEXE)
 
-tb2
+tb2  |>
+  gt::gt() |>
+  gt::tab_caption("Contingency table in long form (full)")
 ```
 
 
@@ -169,7 +174,9 @@ tb2
 tb2 |> 
   pivot_wider(id_cols=CATEGORIE, 
               names_from=SEXE, 
-              values_from=n)
+              values_from=n) |>
+  gt::gt() |>
+  gt::tab_caption("2-ways contingency table (full)")
 
 ```
 
@@ -254,7 +261,9 @@ rare_categories <- df |>
   count(CATEGORIE) |>
   filter(n<=40)
 
-rare_categories
+rare_categories |>
+  gt::gt() |>
+  gt::tab_caption("Rare categories (n < 40)")
 ```
 
 ```{r}
@@ -268,11 +277,39 @@ df <- df |>
 tb <- df |>
   select(CATEGORIE, SEXE) |> 
   table()
-
-df |>
-  count(CATEGORIE, SEXE)
 ```
-  
+
+::: {.columns}
+::: {.column}
+```{r}
+df |>
+  count(CATEGORIE, SEXE) |>
+  gt::gt() |>
+  gt::tab_caption("Contingency table in long form") 
+```
+
+:::
+::: {.column}
+
+
+```{r}
+gt_o <- df |> 
+  count(CATEGORIE, SEXE) |> 
+  tidyr::pivot_wider(
+    id_cols=CATEGORIE, 
+    names_from=SEXE, 
+    values_from=n) |>
+  gt::gt() |>
+  gt::tab_caption("Contingency table in wide form\\n (2-way table)") 
+
+gt_o
+```
+
+:::
+:::
+<!-- end columns -->
+
+
 ```{r}
 mosaicplot(~ CATEGORIE + SEXE, df)
 ```
@@ -330,6 +367,7 @@ vcd::mosaic(formula=SEXE~CATEGORIE,
 
 
 ```{r}
+#| label: chi-2-1
 test_1 <- df |>
   select(CATEGORIE, SEXE) |>
   table() |>
@@ -339,7 +377,8 @@ test_1 <- df |>
 
 test_1 |>
   broom::tidy() |>
-  knitr::kable()
+  gt::gt() |>
+  gt::fmt_number(decimals=2)
 
 ```
 
@@ -356,6 +395,8 @@ Compute the Chi-square statistics from the contingeny table
 ::: {.callout-tip}
 
 ```{r}
+#| label: chi-2-nuts
+#| 
 rowcounts <- apply(tb, MARGIN = 1, FUN = sum)
 colcounts <- apply(tb, MARGIN = 2, FUN = sum)
 
@@ -363,9 +404,41 @@ expected <- (rowcounts %*% t(colcounts))/sum(colcounts)
 
 # norm((tb - expected) / sqrt(expected), type = "F")^2
 
-expected |>
-  as_tibble() |>
-  knitr::kable()
+gt_e <- expected |>
+  tibble::as_tibble() |> 
+  mutate(CATEGORIE= levels(df$CATEGORIE)) |>
+  relocate(CATEGORIE) |>
+  gt::gt() |>
+  gt::fmt_number(decimals=2) |>
+  gt::tab_caption("Expected counts CATEGORIE/SEXE")
+```
+
+
+::: {.columns}
+::: {.column}
+
+```{r}
+#| echo: false
+gt_o
+```
+:::
+
+::: {.column}
+
+```{r}
+#| echo: false
+gt_e
+```
+
+:::
+:::
+
+<!-- end columns -->
+
+```{r}
+#| label: hand-made-chi-2
+
+norm((tb - expected) / sqrt(expected), type = "F")^2
 ```
 
 :::

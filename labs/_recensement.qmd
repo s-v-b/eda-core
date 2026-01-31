@@ -13,7 +13,7 @@ of the fact that we saved the result of our data wrangling job in a self-documen
 
 Download a `parquet` file from the following URL: 
 
-`https://stephane-v-boucheron.fr/data/Recensement.parquet`
+`https://s-v-b.github.io/MA7BY020/DATA/Recensement.parquet`
 
 :::
 
@@ -49,7 +49,7 @@ fname <- "Recensement.parquet"
 
 fpath <- paste(datapath, fname, sep="/")
 
-url <- 'https://stephane-v-boucheron.fr/data/Recensement.parquet'
+url <- 'https://s-v-b.github.io/MA7BY020/DATA/Recensement.parquet'
 
 if (!file.exists(fpath)) {
   tryCatch(
