@@ -5,8 +5,8 @@ Once again we rely on the `Recensement` dataset.
 Load the data into the session environment and call it `df`. Take advantage 
 of the fact that we saved the result of our data wrangling job in a self-documented file format. Download a `parquet` file from the following URL: 
 
-`https://stephane-v-boucheron.fr/data/Recensement.parquet`
 
+`https://s-v-b.github.io/MA7BY020/DATA/Recensement.parquet`
 
 
 ::: {.callout-note title="Question"}

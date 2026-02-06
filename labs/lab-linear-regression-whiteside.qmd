@@ -1,7 +1,7 @@
 ---
 title: 'LAB: Linear Regression on Whiteside data'
 date: "`r Sys.time()`"
-draft: true 
+draft: false 
 
 execute:
   echo: true
@@ -107,8 +107,8 @@ Have a glimpse at the data.
 
 ```{r}
 #| label: whiteside-glimpse
-whiteside %>% 
-  glimpse
+whiteside |>
+  glimpse()
 ```
 
 Even though the experimenter, Mr Whiteside, decided to apply a *treatment* to his house. This is not exactly what we call *experimental data*.  Namely, the experimenter has no way to clamp the external temperature. 
@@ -177,7 +177,7 @@ We may test the normality of the `Gas`  and `Temp`  distribution
 test_norm_num <- function(df, ze_test=shapiro.test) {
   summarise(df,
             across(where(is.numeric),
-                    ~ list(ze_test(.x)|> tidy())
+                    \(x) list(ze_test(x)|> tidy())
             )
     ) |>
   pivot_longer(cols=everything(),
@@ -189,7 +189,8 @@ test_norm_num <- function(df, ze_test=shapiro.test) {
 }
 
 whiteside |> 
-  test_norm_num()
+  test_norm_num()  |>
+  gt::tab_caption("Normality tests for Whiteside dataset")
 ```
 
 Both variables pass the Shapiro-Wilk test with flying colors. 
@@ -206,7 +207,7 @@ jb <- tseries::jarque.bera.test
 
 whiteside |> 
   test_norm_num(ze_tes=jb) |>
-  tab_caption("Whiteside dataset")
+  tab_caption("Other normality tests for Whiteside dataset")
 ```
 
 Both variables also pass the Jarque-Bera test with flying colors. This is noteworthy 
@@ -267,14 +268,14 @@ Note the `position` parameter for `geom_histogram()`. Check the result for `posi
 
 Gas Consumption distribution `After` looks shifted with respect to distribution `Before`.
 
-Another visualization strategy consists in using the faceting mechanism
+Another visualization strategy consists in using the *faceting* mechanism
 
 ```{r}
 #| label: before-after-histo-facet
-r <- whiteside %>% 
+r <- whiteside |> 
   pivot_longer(cols=c(Gas, Temp),
               names_to = "Vars",
-              values_to = "Vals") %>% 
+              values_to = "Vals") |>
   ggplot() +
   aes(x=Vals)  +
   facet_wrap(~ Insul + Vars ) + 
@@ -286,12 +287,20 @@ r +
   ggtitle(glue("{cur_dataset} data"))
 ```
 
+Visual inspection suggests that the distributions of `Temp` before and after insulation are different.
+
+We may further explore this question using linear modeling. The output of function `lm()` is an 
+object of class `lm` (a list with attributes). This object can be fed to `broom::glance()` 
+to obtain 
 
 ```{r}
 #| label: anova-temp-insul-1
 
 lm(Temp ~ Insul, data=whiteside) |>
-  broom::glance()
+  broom::glance() |> 
+  gt::gt() |>
+  gt::fmt_number(decimals=2)  |>
+  gt::tab_caption("Linear regression of Temp with respect to Insul, whiteside dataset")
 ```
 
 ```{r}
@@ -337,7 +346,7 @@ C <- whiteside |>
   cov()
 
 mu_n <- whiteside %>% 
-  select(where(is.numeric)) %>% 
+  select(where(is.numeric)) |>
   colMeans()
 ```
 
@@ -380,7 +389,7 @@ my_cor <-  . %>%
 # even better: pass column names as arguments
 
 my_cor2 <-  function(df, col1, col2){
-  df %>% 
+  df |>
   summarize(
     pearson= cor({{col1}}, {{col2}}, method="pearson"),
     kendall=cor({{col1}}, {{col2}}, method="kendall"),
@@ -489,7 +498,7 @@ Build boxplots of `Temp` and  `Gas` versus `Insul`
 
 ```{r}
 #| label: boxplots
-q <- whiteside %>% 
+q <- whiteside |> 
   ggplot() +
   aes(x=Insul)
 
@@ -628,7 +637,6 @@ Use `lm()` to compute slope and intercept. Denote the object created
 by constructor `lm()` as `lm0`. 
 
 - What is the class of `lm0` ?
-- 
 
 :::
 
@@ -677,7 +685,7 @@ We can use the exposing pipe from `magrittr` (or the `with` construct from base 
 to build a function that extracts the coefficients estimates, standard error, $t$-statistic and associated p-values.  
 ```{r}
 #| label: tidy-steroids
-tidy_lm <- . %$% (    # <1>  The lhs is meant to be of class lm
+tidy_lm <- . %$% (     # <1>  The lhs is meant to be of class lm
   tidy(.)  %>%         # <2> . acts as a pronoun for magrittr pipes     
   gt::gt() %>% 
   gt::fmt_number(decimals=2) %>% 
@@ -698,7 +706,7 @@ of lazy evaluation mechanisms.
 
 ::: {.callout-note title="Question"}
 
-Function `glance()` extract informations that can be helpful when performing model/variable selection. 
+Function `glance()` extract information that can be helpful when performing model/variable selection. 
 
 :::
 
@@ -708,6 +716,8 @@ Function `glance()` extract informations that can be helpful when performing mod
 ::: {.callout-tip title="Solution"}
 
 The next chunk handles several other parts of the summary. 
+
+
 ```{r}
 #| label: glance-steroids
 #| 
@@ -884,6 +894,8 @@ This does not preclude other kinds of dependencies.
 - Assessing departure of noise distribution from Gaussian setting.
 - Spotting points with high leverage
 - Spotting possible outliers. 
+:::
+:::
 
 ::: {.callout-note title="Question"}
 
@@ -923,9 +935,6 @@ diag_plots <- autoplot(lm0, data=whiteside)
 class(diag_plots)
 ```
 
-:::
-
-:::
 
 
 ```{r}
@@ -1049,7 +1058,7 @@ autoplot(lm0)
 
 ```{r}
 #| label: augment-lm0 
-whiteside_aug <- lm0 %>% 
+whiteside_aug <- lm0 |>
   augment(whiteside)
 
 lm0 %$% ( # exposing pipe !!! 
@@ -1101,7 +1110,7 @@ Plot residuals against fitted values
 
 ```{r}
 
-diag_1 <- whiteside_aug %>% 
+diag_1 <- whiteside_aug |>
   ggplot() +
   aes(x=.fitted, y=.resid)+
   geom_point(aes(shape= Insul), size=1, color="black") +
@@ -1387,7 +1396,7 @@ p +
 
 ::: {.callout-tip title="Solution"}
 
-```{r lm1-diagnostics}
+```{r}
 #| label: diag-plots-lm1 
 
 (diag_1 %+% whiteside_aug1) +
@@ -1450,7 +1459,7 @@ Function `model.matrix()` allows us to inspect the design matrix.
 
 ::: {.callout-tip title="Solution"}
 
-```{r design_matrix}
+```{r}
 #| label: lm1-design-matrix
 model.matrix(lm1) %>% 
   as_tibble() %>% 
@@ -1461,7 +1470,7 @@ model.matrix(lm1) %>%
   gt::tab_caption(glue("Design matrix for {deparse(lm1$call$formula)}")) 
 ```
 
-```{r design-matrix}
+```{r}
 #| label: extract-design-matrix-lm1
 #| 
 X <- model.matrix(lm1)
@@ -1681,24 +1690,28 @@ $$
 
 # Appendix
 
-## `S3`  classes in `R`
+This lab uses constructs of language `R` we have not mentioned so far.  
+Have a look at the documentation to get acquainted with this important and convenient notions. 
 
 
+## [`S3`  classes in `R`](https://adv-r.hadley.nz/s3.html)
 
+Generic functions for `S3`  classes are used extensively in this lab. Functions from `broom`, `ggplot2`,  and `ggfortify` are often generic functions.
 
-## Generic functions for `S3`  classes
-
-`methods(autoplot)` lists the `S3` classes for which an  autoplot method is defined. 
-Some methods are defined in `ggplot2`, others like `autoplot.lm` are defined in extension 
+`methods(autoplot)` lists the `S3` classes for which an  autoplot method is defined.  Some methods are defined in `ggplot2`, others like `autoplot.lm` are defined in extension 
 packages like `ggfortify`. 
 
 
 
 ## `S4` classes in `R`
 
-The output of `autoplot.lm` is an instance  of `S4` class
+The output of `autoplot.lm` is an instance  of [`S4` class](https://adv-r.hadley.nz/s4.html).
 
+See also [New trends](https://rconsortium.github.io/S7/): 
+
+> The S7 package is a new OOP system designed to be a successor to S3 and S4. It has been designed and implemented collaboratively by the R Consortium Object-Oriented Programming Working Group, which includes representatives from R-Core, Bioconductor, the tidyverse/Posit, and the wider R community.
 
 ## `tibbles` with list columns
 
-
+We also used tibbles with list  columns, that is nested dataframes. Nested dataframes show up in every implementation of dataframes (from `R` to Spark),
+see: [Tidyr: article on nesting](https://tidyr.tidyverse.org/articles/nest.html)

@@ -153,14 +153,14 @@ tb <- df |>
   dplyr::select(CATEGORIE, SEXE) |>
   table() 
 
-# tb
+tb 
 ```
 
 
 ```{r}
 #| label: long-contingency-table
 tb2 <- df |>
-  count(CATEGORIE, SEXE)
+  dplyr::count(CATEGORIE, SEXE)
 
 tb2  |>
   gt::gt() |>
@@ -172,11 +172,11 @@ tb2  |>
 ```{r}
 #| label: pivot-long-2way-table
 tb2 |> 
-  pivot_wider(id_cols=CATEGORIE, 
+  tidyr::pivot_wider(id_cols=CATEGORIE, 
               names_from=SEXE, 
               values_from=n) |>
   gt::gt() |>
-  gt::tab_caption("2-ways contingency table (full)")
+  gt::tab_caption("2-ways contingency table in wide form (full)")
 
 ```
 
@@ -194,14 +194,31 @@ Use `mosaicplot()` from base `R` to visualize the contingency table.
 
 ::: {.callout-tip}
 
+
 ```{r}
-#| label: mosaics
+#| label: mosaics-1
 mosaicplot(~ CATEGORIE + SEXE, 
            tb, 
-           main="Données Recensement")
-
-mosaicplot(~ SEXE + CATEGORIE, tb)
+           main="Données Recensement, ~ CATEGORIE + SEXE", 
+           las=2)
 ```
+
+```{r}
+#| label: mosaics-2
+mosaicplot(~ SEXE + CATEGORIE, 
+           tb, 
+           main="Données Recensement, ~ SEXE + CATEGORIE",
+           las=2)
+
+
+```
+
+Mosaic plots belong to the family of area plots. For each couple of levels, a rectangle is plotted with surface area proportional to the frequency of the couple of levels. 
+
+In a 2-way mosaicplots, the width of the rectangles is proportional to the marginal count of the levels of the variable mapped to the `X` axis (first variable in the formula). For each level says `a` of the `X` variable, the height of the subrectangle corresponding to a level say `b` of the `Y` variable  is proportional to the ratio between the frequency if couple `(a,b)` and the marginal frequency of `a`.
+
+The mosaicplot with formula `~ CATEGORIE + SEXE` allows us to visualize the frequencies of the different levels of `CATEGORIE`, and for each level of `CATEGORIE` the sex ratio of that level. 
+
 
 :::
 
@@ -210,6 +227,7 @@ mosaicplot(~ SEXE + CATEGORIE, tb)
 ::: {.callout-note title="Question"}
 
 Use `geom_mosaic` from `ggmosaic` to visualize the contingency table
+while complying with the `ggplot2` look and feel.
 
 - Make the plot as readable as possible
 - Reorder `CATEGORIE` acccording to counts
@@ -220,20 +238,36 @@ Use `geom_mosaic` from `ggmosaic` to visualize the contingency table
 
 ::: {.callout-tip}
 
+The next layer will be used repeatedly. 
+
 ```{r}
 #| label: rotation-label-trick
 #| warning: true
 #| eval: true
-rot_x_text <- theme(
-  axis.text.x = element_text(angle = 45)
+rot_x_text <- ggplot2::theme(
+  axis.text.x = ggplot2::element_text(angle = 45)
 )
+
+old_theme <- ggplot2::theme_set(theme_minimal())
+
+theme_update(
+  axis.text.x = ggplot2::element_text(angle = 45),
+  legend.position="None")
 ```
 
 ```{r}
+#| label: palette-greys
+#| eval: false
 df |>
-  ggplot() +
-  geom_mosaic(aes(x=product(SEXE, CATEGORIE), fill=SEXE)) +
-  rot_x_text  
+  ggplot2::ggplot() +
+  ggmosaic::geom_mosaic(
+    ggplot2::aes(
+      x=ggmosaic::product(SEXE, CATEGORIE), 
+     fill=SEXE)) +
+  # ggplot2::scale_fill_brewer(
+  #   palette ="Greys"
+  # ) +
+  ggtitle(label="")
 ```
 :::
 
@@ -252,7 +286,7 @@ is rare if it has less than 40 occurrences). Use tools from `forcats`.
  
  
 ```{r}
-
+#| label: rare-categories
 df |> 
   count(CATEGORIE) |> 
   arrange(desc(n))
@@ -311,7 +345,7 @@ gt_o
 
 
 ```{r}
-mosaicplot(~ CATEGORIE + SEXE, df)
+mosaicplot(~ CATEGORIE + SEXE, df, las=2)
 ```
 
 
@@ -621,6 +655,59 @@ where $C$ is the number of *concordant pairs*, and $D$ is the number of *discord
 | Computational efficiency | Faster | Slower (due to pairwise comparisons) |
 | Interpretation | Similar to Pearson’s correlation | More intuitive (proportion of concordance) |
 
+
+## Testing correlation
+
+Assuming that the data are collected using i.i.d. sampling, we may test 
+
+- Null hypothesis: the population correlation coefficient is zero
+- Alternative: the population correlation coefficient differs from zero
+
+This binary testing problem (where both the Null and the Alternative are composite) can be stated for the three flavors of correlation coefficients described above. 
+
+Note that we have stated the problem with two-sided alternative. It can also be stated with one-sided alternatives ()
+
+::: {.callout-note title="Question"}
+
+Use function `cor.test()` to test correlation between `AGE` and `SAL_HOR`
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::: {.callout-tip title="Solution"}
+
+```{r}
+methods <- c("pearson", "kendall", "spearman")
+
+foo <- function(lst) {
+  lst |> 
+  purrr::map(broom::tidy) |>
+  bind_rows() |>
+  gt::gt() |>
+  gt::fmt_number(c(estimate, conf.low, conf.high), decimals=3) |>
+  gt::fmt_scientific(c(statistic, p.value), decimals=2) |>
+  gt::tab_caption("Correlation tests for AGE and SAL_HOR")
+}
+
+methods |>
+  purrr::map( \(x) {cor.test(x=df$AGE, y=df$SAL_HOR, method=x, exact=F)})|>
+  foo() 
+
+```
+
+
+```{r}
+methods |>
+  purrr::map( \(x) {cor.test(x=df$AGE, y=df$SAL_HOR, alternative="greater", method=x, exact=F)})|>
+  foo()  
+
+```
+:::
+
+
+
+:::
 
 
 ## Chatterjee's correlation coefficient (Chatterjee's $ξ$)
