@@ -14,8 +14,6 @@ format:
     output-file: lab-linear-regression-whiteside.html
   pdf:
     output-file: lab-linear-regression-whiteside.pdf
-
-
 ---
 
 
@@ -284,7 +282,8 @@ r <- whiteside |>
 r +
   aes(y=after_stat(density)) +
   geom_histogram(alpha=.3, fill="white", color="black", bins=6) +
-  ggtitle(glue("{cur_dataset} data"))
+  ggtitle(glue("{cur_dataset} data")) +
+  theme_minimal()
 ```
 
 Visual inspection suggests that the distributions of `Temp` before and after insulation are different.
@@ -477,7 +476,8 @@ p <- whiteside |>
   )
 
 p + 
-  ggtitle(glue("{cur_dataset} dataset"))
+  ggtitle(glue("{cur_dataset} dataset")) +
+  theme_minimal()
 
 ```
 
@@ -500,13 +500,16 @@ Build boxplots of `Temp` and  `Gas` versus `Insul`
 #| label: boxplots
 q <- whiteside |> 
   ggplot() +
-  aes(x=Insul)
+  aes(x=Insul) +
+  xlab("") +
+  theme_minimal()
 
 qt <- q + 
-  geom_boxplot(aes(y=Temp))
+  geom_boxplot(aes(y=Temp)) 
 
 qg <- q + 
-  geom_boxplot(aes(y=Gas))
+  geom_boxplot(aes(y=Gas)) 
+
 
 (qt + qg) +
   patchwork::plot_annotation(title = glue("{cur_dataset} dataset"))
@@ -561,8 +564,9 @@ r +
                fill="grey", 
                color="black", 
 #               bw = "SJ",
-               adjust = .5 ) +
-  ggtitle(glue("{cur_dataset} data"))
+               adjust = .85 ) +
+  ggtitle(glue("{cur_dataset} data")) +
+  theme_minimal()
 ```
 
 :::
@@ -776,7 +780,8 @@ purrr::map(conf_levels, \(x) confint(lm0, level=x)) |>
   purrr::map(\(x) pivot_longer(x, cols=ends_with("%"), names_to="conf", values_to="bound")) |>
   bind_rows() |>
   gt::gt() |>
-  gt::fmt_number(decimals = 2)
+  gt::fmt_number(decimals = 2) |>
+  gt::tab_caption("Confidence bounds for simple linear regression on whiteside data")
 
 
 ```
@@ -816,14 +821,14 @@ sum(residuals(lm0)^2)
 ```
 
 
-
+Function `conf_region` builds a confidence ellipsoid for simple linear regression coefficients based on design  matrix `X`, OLS estimated parameters `x0, y0`, estimated noise standadrd deviation `sigma`.   
 
 ```{r}
 #| label: confidence-region
 #| 
 conf_region <- function(X, x0=0, y0=0, sigma=1, df1=2, df2=nrow(X)-2, alpha=.05, ...){ 
 
-  falpha <- qf(alpha, df1, df2, lower.tail = F)
+  falpha <- qf(alpha, df1, df2, lower.tail = F)  # quantile of F distribution 
 
   specdec <- eigen(t(X) %*% X)
   angle <- acos(specdec$vectors[1,1])
@@ -845,18 +850,23 @@ conf_region <- function(X, x0=0, y0=0, sigma=1, df1=2, df2=nrow(X)-2, alpha=.05,
 }
 ```
 
+Package `zeallot` aims at providing a kind of *unpacking*.  
+
 ```{r}
 #| label: plot-confidence-region
 
 require(zeallot)  # experimental 
 
-c(x0,y0) %<-% coefficients(lm0)
+c(x0,y0) %<-% coefficients(lm0)  
+# x0 <- coefficients(lm0)['(Intercept)']
+# y0 <- coefficients(lm0)['Temp']
 
 ggplot() +
   conf_region(X, x0, y0, linetype='dashed') +
   conf_region(X, x0, y0, alpha=.01, linetype='dotted') +
-  conf_region(X, x0, y0, alpha=.1, )
-  coord_fixed()
+  conf_region(X, x0, y0, alpha=.1 ) +
+  coord_fixed() +
+  theme_minimal()
 ```
 
 ::: 
@@ -894,6 +904,7 @@ This does not preclude other kinds of dependencies.
 - Assessing departure of noise distribution from Gaussian setting.
 - Spotting points with high leverage
 - Spotting possible outliers. 
+
 :::
 :::
 
@@ -926,16 +937,18 @@ vanilla <- c(
 
 ```{r}
 #| label: autoplot-lm0
+#| warning: false
+#| message: false
 diag_plots <- autoplot(lm0, data=whiteside)
 ```
 
-`diag_plots` is an instance of an [`S4`  class]() 
+`diag_plots` is an instance of an [`S4`  class](https://adv-r.hadley.nz/s4.html). Check this with `sloop::otype(diag_plots)`.  
 
 ```{r}
 class(diag_plots)
 ```
 
-
+`!!!` (bang-bang-bang) is provided by `rlang` package.
 
 ```{r}
 diag_plots@plots[[1]] +
@@ -964,8 +977,9 @@ lm0_augmented |>
   ylab("Residuals") +
   labs(
     !!!vanilla,
-    subtitle = "Residuals versus fitted values"
-  )
+    subtitle = "Residuals versus fitted values  (hand-made)"
+  ) +
+  theme_minimal()
 ```
 
 Overplotting (mapping `Insul` over shape aesthetics) reveals that residuals 
@@ -1009,7 +1023,7 @@ diag_plots@plots[[3]] +
 ```
 
 The amplitude of *standardized residuals* seems to be an increasing function of 
-fitted values. This suggests departure from homoschedasticity. 
+fitted values. This suggests departure from *homoschedasticity*. 
 
 Two points are singled out (with row index)
 
@@ -1022,17 +1036,16 @@ diag_plots@plots[[4]] +
     subtitle = ""
   )
 ```
+
 Double check points with high leverage.
 
 Why points with high leverage and large standardized residuals matter. 
-
-
 
 The motivation and usage of diagnostic plots is explained in detail in the book by Fox and Weisberg: *An R companion to applied regression*.
 
 In words, the diagnostic plots serve to assess the validity of the Gaussian linear modelling assumptions on the dataset. The assumptions can be challenged for a number of reasons:
 
-- The response variable may be a function of the covariates but not a lienar one. 
+- The response variable may be a function of the covariates but not a linear one. 
 - The noise may be heteroschedastic
 - The noise may be non-Gaussian
 - The noise may exhibit dependencies.  
@@ -1043,7 +1056,7 @@ In words, the diagnostic plots serve to assess the validity of the Gaussian line
 
 The diagnostic plots are built from the information gathered in the `lm` object returned by `lm(...)`. 
 
-{{< fa broom >}} It is convenient to extract the required pieces of information using method `augment.lm`. of *generic function* `augment()` from package `broom`. 
+{{< fa broom >}} It is convenient to extract the required pieces of information using method `augment.lm()`. of *generic function* `augment()` from package `broom`. 
 
 
 ::: {.content-visible when-profile="solution"}
@@ -1068,7 +1081,7 @@ lm0 %$% ( # exposing pipe !!!
   sample_n(5) %>% 
   ungroup() %>% 
   gt::gt() %>% 
-  gt::tab_caption(glue("Dataset {call$data},  {deparse(call$formula)}"))
+  gt::tab_caption(glue("Dataset {call$data},  {deparse(call$formula)}, sampled rows"))
 )
 ```
 
@@ -1193,7 +1206,7 @@ diag_2 <- whiteside_aug %>%
 
 ::: {.callout-note title="Question"}
 
-
+Gather the three hand-made diagnostic plots together using `patchwork`
 
 :::
 
@@ -1262,7 +1275,10 @@ Check the design using function `model.matrix()`. How can you relate this augmen
 ```{r}
 #| label: check-design
 model.matrix(lm1) |>
-  head()
+  as_tibble() |>
+  slice_sample(n=5, by=InsulAfter)|>
+  gt::gt() |>
+  gt::tab_caption(glue("Excerpt of model matrix for linear regression  Gas ~ Temp*Insul"))
 ```
 
 `InsulAfter` is the result of *one-hot encoding* of boolean column `Insul`: 
@@ -1398,7 +1414,8 @@ p +
 
 ```{r}
 #| label: diag-plots-lm1 
-
+#| warning: false
+#| message: false
 (diag_1 %+% whiteside_aug1) +
 (diag_3 %+% whiteside_aug1) +  
 (diag_2 %+% whiteside_aug1) +
@@ -1452,7 +1469,7 @@ diag_plots@plots[[4]] +
 :::
 
 
-Function `model.matrix()` allows us to inspect the design matrix. 
+Function `model.matrix()` allows us again to inspect the design matrix. 
 
 
 ::: {.content-visible when-profile="solution"}
@@ -1480,6 +1497,8 @@ X <- model.matrix(lm1)
 
 :::
 
+## Solving OLS with QR factorization 
+
 
 In order to solve le Least-Square problems, we have to compute 
 $$(X^T \times X)^{-1} \times X^T$$
@@ -1487,6 +1506,17 @@ This can be done in several ways.
 
 `lm()` uses QR factorization. 
 
+::: {.callout-note title="Question"}
+
+Extract the QR factorization of the design matrix from `lm1`
+
+- Check that the columns of `Q` form an orthorgonal family
+- Check that `R` is upper triangular
+- Compute the Hat matrix from the QR factorization
+- Check that the Hat matrix is an orthonormal projection matrix on the column space of the design.
+
+
+:::
 
 ::: {.content-visible when-profile="solution"}
 
@@ -1529,6 +1559,18 @@ sum((solve(R) %*% t(Q) %*% whiteside$Gas - lm1$coefficients)^2)
 
 :::
 
+
+::: {.callout-note title= "Question"}
+
+Compute the Gram matrix of the row vectors of the design matrix for `lm1`
+
+:::
+
+::: {.content-visible when-profile="solution"}
+
+::: {.callout-tip title="Solution"}
+
+
 ```{r}
 #matador::mat2latex(signif(solve(t(X) %*% X), 2))
 ```
@@ -1543,13 +1585,12 @@ $$
 $$
 
 
-::: {.content-visible when-profile="solution"}
-
-::: {.callout-tip title="Solution"}
 
 
 ```{r }
 #| label: fitted-H-matrix
+#| eval: false
+#| echo: false
 whiteside_aug1 %>% 
   glimpse()
 ```
@@ -1558,8 +1599,11 @@ whiteside_aug1 %>%
 
 :::
 
+::: {.callout-note title="Question"}
 
-Understanding `.fitted` column
+Understand `.fitted` column in `augment(lm1, whiteside)`
+
+:::
 
 
 ::: {.content-visible when-profile="solution"}
@@ -1602,8 +1646,7 @@ sum((whiteside_aug1$.resid + H %*% whiteside_aug1$Gas - whiteside_aug1$Gas)^2)
 
 ::: {.callout-note title="Question"}
 
-Understanding `.hat`
-
+Understand `.hat`
 
 :::
 
