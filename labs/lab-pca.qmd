@@ -101,6 +101,7 @@ swiss %>%
 ```
 
 Have a look at the documentation of the dataset
+
 ```{r}
 #| include: false
 ?swiss
@@ -353,8 +354,7 @@ svd_Y %$%   # <1>
 norm( 
   diag(1, ncol(Y)) - 
   (svd_Y %$% (t(v) %*% v)), 
-  'F'
-)  # <3>. 
+  'F' )  # <3>
 ```
 1. Exposing pipe from `magrittr`
 2. Checking the factorization
@@ -480,12 +480,13 @@ We first check that the matrix can be recovered from the product of the componen
 
 ```{r}
 #| results: markup
-(Y - pco$x %*% t(pco$rotation )) %>% 
-  round(digits = 2)  %>% 
+(Y - pco$x %*% t(pco$rotation )) |> 
+  round(digits = 2)  |>
   head()
 ```
 
 We now check that the `rotation` component is indeed made of the right singular vectors (the $V$ factor)
+
 ```{r}
 #| results: markup
 (svd_Y$v %*% t(pco$rotation )) %>% 
@@ -493,9 +494,10 @@ We now check that the `rotation` component is indeed made of the right singular 
 ```
 
 The column vectors of component $x$ are pairwise orthogonal. 
+
 ```{r}
 #| results: markup
-(t(pco$x) %*% pco$x) %>% 
+(t(pco$x) %*% pco$x) |> 
   round(2)  
 ```
 
@@ -507,14 +509,14 @@ norm(pco$x - svd_Y$u %*% diag(svd_Y$d),type="F")
 norm(as.matrix(pco$rotation) -svd_Y$v, type="F")
 ```
 
-The connection between $pco$sdev$ and $svd_Y$d$ is somewhat less transparent.
+The connection between `pco$sdev` and `svd_Y$d` is somewhat less transparent.
+
 ```{r}
 sum(abs(apply(pco$x, 2, sd) - pco$sdev))
 ```
 
 
 The components of `pco$sdev` are the standard deviations of the columns of $U \times D$.
-<!-- $$\verb{pco$sdev}[i]^2 = \frac{\verb{svd_Y$d}[i]^2}{n-1}$$ -->
 
 ```{r}
 pco$sdev - svd_Y$d/sqrt(nrow(Y)-1)
@@ -536,6 +538,7 @@ have unit norm.
 ::: {.callout-tip title="solution"} 
 
 Check that rows and columns of matrix `rotation`  have unit norm.
+
 ```{r}
 #| results: markup
 apply(pco$rotation, 2, \(x) norm(x, "2"))
@@ -603,6 +606,7 @@ two principal components (first two columns).
 ::: 
 
 As `autoplot(pco)` is an instance of class  `ggplot`, it can be annotated, decorated as any other `ggplot` object.
+
 ```{r}
 (
   res + aes(color=Catholic) + theme_minimal()
@@ -627,6 +631,7 @@ Define a graphical pipeline for the *screeplot*.
 
 Hint: use function `tidy()` from `broom`, to get the data in the right form from an instance of `prcomp`.
 
+
 :::
 
 ::: {.content-visible when-profile="solution"} 
@@ -646,6 +651,8 @@ p_screeplot <- . %>%   # <1>
   } 
 
 ```
+
+
 1. Define a pipeline for building a screeplot
 2. Mind the braces on the right side of the first pipe
 3. `1- cumulative` tell the reader about the relative Frobenious error achieved by keeping the first components of the SVD expansion. 
@@ -675,13 +682,15 @@ Define a function that replicates `autoplot.prcomp()`
 
 Project the dataset on the first two principal components (perform dimension reduction) and build a scatterplot. Colour the points according to the value of  original covariates.  
 
-Hint: use generic function `augment` from `broom`.
+Hint: use generic function `augment()` from `broom`.
+
 
 :::
 
 
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 #| warning: false
 #| message: false
@@ -732,6 +741,7 @@ Comment.
 
 We can extract factor $V$ from the SVD factorization 
 using generic function `tidy` from package `broom`
+
 ```{r}
 #| results: markup
 pco %>% 
@@ -771,6 +781,7 @@ Build the third SVD plot, the so called *correlation circle*.
 The correlation circle is built from the *loadings*, that is, from the `rotation` component of the `prcomp` object.
 
 We define a preprocessing function to  transform the rotation object into a proper `tibble` form. 
+
 ```{r}
 prep_co_circle <- function(pco) {
   r <- pco$rotation
@@ -891,6 +902,7 @@ Pay attention to the correlation circles.
 
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 pco_c <- swiss %>% 
   select(-Fertility) %>% 
@@ -936,7 +948,8 @@ In the sequel we focus on standardized PCA.
 
 
 ::: {.content-visible when-profile="solution"} 
-::: {.callout-tip title="solution"} 
+::: {.callout-tip title="solution"}  
+
 ```{r}
 q <-  autoplot(pco_cs, data=swiss) +
   theme_minimal()
@@ -1001,6 +1014,7 @@ Analyze the signs of correlations between variables and axes?
 
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 swiss |>   # ggrepel::geom_text_repel(data=df_cocirc, 
   #                          aes(x= 4* `1`,
@@ -1072,6 +1086,7 @@ Design a graphical pipeline.
 ::: {.content-visible when-profile="solution"} 
 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 pco <- swiss %>% 
   select(-Fertility) %>% 
@@ -1123,6 +1138,7 @@ overlays the scatterplot defined by the principal components with the correlatio
 ::: {.content-visible when-profile="solution"} 
 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 #| label: biplot
 #| message: false
@@ -1331,6 +1347,7 @@ broom::augment(km.2, scale(swiss)) %>%
 ::: {.content-hidden}
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 whiteside <-  MASS::whiteside
 ```
@@ -1358,6 +1375,7 @@ df_centers.2 <-  make_df_centers(km.2)
 ::: {.content-hidden}
 ::: {.content-visible when-profile="solution"} 
 ::: {.callout-tip title="solution"} 
+
 ```{r}
 #| eval: false
 #| 
