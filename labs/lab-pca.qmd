@@ -7,6 +7,8 @@ execute:
   echo: true
   eval: true
   collapse: true
+  warning: false
+  message: false
 
 format:
   html:
@@ -176,7 +178,7 @@ foobar %>%
 ```{r}
 #| eval: !expr knitr::is_latex_output()
 foobar %>% 
-  knitr::kable()
+  gt::gt() 
 ```
 :::
 
@@ -211,7 +213,8 @@ We reuse the function we have already developped during previous sessions.
 
 ```{r}
 #| label: make_biotiful
-make_biotifoul(swiss, .f = is.numeric)
+make_biotifoul(swiss, .f = is.numeric) +
+  theme_minimal()
 ```
 
 Histograms reveal that our covariates have very different distributions. 
@@ -586,20 +589,24 @@ SVD plots.
 
 ::: {.column}
 ```{r}
-res <- autoplot(pco) +
-  coord_fixed() +
+res <- autoplot(pco) +   # <1>
+  coord_fixed() +        # <2>
   theme_minimal()
 
 ts <- theme_set(theme_minimal())
 
 res
 ```
+
+1. This call is dispatched to method `autoplot.prcomp` defined in package `ggfortify`. Look at the code using `getS3method("autoplot", "prcomp")`
+2. `coord_fixed()` is useful here, since scaling axes matter here.   
+
+
 :::
 
 ::: {.column}
 
-`autoplot(pco)` is a scatterplot for the dataframe defined by matrix $U \times D$ projected on its first 
-two principal components (first two columns). 
+`autoplot(pco)` is a scatterplot for the dataframe defined by matrix $U \times D$ projected on its first  two principal components (first two columns). 
 
 :::
 
@@ -642,7 +649,7 @@ The screeplot is a bar plot where each bar corresponds to a  singular value. The
 
 ```{r}
 p_screeplot <- . %>%   # <1>
-  broom::tidy(matrix="pcs") %>% { 
+  broom::tidy(matrix="pcs") %>%  { 
   ggplot(.) +
   aes(x=PC, y=percent, label=pct_format(1.-cumulative)) +   # <3>
   geom_text(angle=45, vjust=-1, hjust=-.1) + 
@@ -653,7 +660,7 @@ p_screeplot <- . %>%   # <1>
 ```
 
 
-1. Define a pipeline for building a screeplot
+1. Define a pipeline for building a screeplot (this works with `%>%` not with `|>`)
 2. Mind the braces on the right side of the first pipe
 3. `1- cumulative` tell the reader about the relative Frobenious error achieved by keeping the first components of the SVD expansion. 
 
@@ -692,6 +699,7 @@ Hint: use generic function `augment()` from `broom`.
 ::: {.callout-tip title="solution"} 
 
 ```{r}
+#| label: scatterplot-pcs
 #| warning: false
 #| message: false
 p <-  pco %>% # <1>
@@ -747,7 +755,8 @@ using generic function `tidy` from package `broom`
 pco %>% 
   broom::tidy(matrix="v") %>% 
   sample_n(5) |>
-  gt::gt()
+  gt::gt()  |>
+  gt::fmt_number(decimals=2)
 ```
 
 The result is a tibble in *long form*. It is worth pivoting the dataframe  into wide form.
@@ -783,6 +792,8 @@ The correlation circle is built from the *loadings*, that is, from the `rotation
 We define a preprocessing function to  transform the rotation object into a proper `tibble` form. 
 
 ```{r}
+#| label: prep_co_circle
+#| 
 prep_co_circle <- function(pco) {
   r <- pco$rotation
   as_tibble(r) |> 
@@ -914,6 +925,8 @@ pco_cs <- swiss %>%
 ```
 
 ```{r}
+#| label: correlation-circle-scaled-or-not
+patchwork::wrap_elements(
 (
   co_circle_ppl %+% 
   prep_co_circle(pco_c)  +
@@ -921,7 +934,7 @@ pco_cs <- swiss %>%
     subtitle = "centered, unscaled"
   ) + 
   theme_minimal()  
-) +
+) ,
 (
   co_circle_ppl %+%  
   prep_co_circle(pco_cs) +
@@ -929,7 +942,7 @@ pco_cs <- swiss %>%
     subtitle = "centered, scaled"
   ) +
   theme_minimal()  
-) +
+)) +
   patchwork::plot_annotation(
         title="Swiss, correlation circle"
   )
@@ -951,6 +964,8 @@ In the sequel we focus on standardized PCA.
 ::: {.callout-tip title="solution"}  
 
 ```{r}
+#| label: coloring-scatterplot
+#| 
 q <-  autoplot(pco_cs, data=swiss) +
   theme_minimal()
 
@@ -995,6 +1010,7 @@ This comes from the correlation circle. We rely on function `prep_co_circle` and
 on the graphical pipeline `co_circle_ppl`. 
 
 ```{r}
+#| label: re-corr-circle 
 (
   co_circle_ppl %+% 
     prep_co_circle(pco_cs) +
@@ -1016,6 +1032,7 @@ Analyze the signs of correlations between variables and axes?
 ::: {.callout-tip title="solution"} 
 
 ```{r}
+#| label: swiss-corplot 
 swiss |>   # ggrepel::geom_text_repel(data=df_cocirc, 
   #                          aes(x= 4* `1`,
   #                              y= 4 * `2`, 
@@ -1047,6 +1064,10 @@ How does  `Fertility` relate with covariates? with principal axes?
 
 We use 
 $$D^{-1} \times U^\top \times X = V^\top$$
+
+or equivalently 
+
+$$X^\top \times U \times D^{-1} = V$$
 
 It is enough to multipliy the data matrix by $D^{-1} \times U^\top$ and to 
 pipe the result into the coorelation circle graphical pipeline.
@@ -1146,9 +1167,9 @@ overlays the scatterplot defined by the principal components with the correlatio
 bip <- autoplot(pco_cs, 
          data=swiss, 
          color="Fertility", 
-         loadings = TRUE, 
+         loadings = TRUE,   # <1>
          loadings.colour = 'blue',
-         loadings.label = TRUE) +
+         loadings.label = TRUE) +   # <2>
   coord_fixed() +
   labs(
     title = "Biplot",
@@ -1162,7 +1183,14 @@ ts <- theme_set(theme_minimal())
 bip
 ```
 
+1. `loadings= TRUE` overlays the correlation circle and the principal components scatterplot. 
+2. Helpful  if not too much overplotting. Otherwise, use hovering. 
 
+:::
+
+::: {.callout-tip title="solution"} 
+
+Using translation to `plotly` enables hovering.
 
 ```{r}
 #| label: biplotly
@@ -1187,23 +1215,33 @@ bip_plotly <- autoplot(pco_cs,
 bip |> plotly::ggplotly()
 ```
 
+:::
+
+
+::: {.callout-tip title="solution"} 
+
+Home made biplot using `broom::augment()`
+
 ```{r}
 #| label: biplotly-home
 #| message: false
 #| warning: false
+#| eval: false
 (
 broom::augment(pco, data=rownames_to_column(swiss, var="district")) |> 
   ggplot() + 
   geom_point(aes(x=.fittedPC1, 
                  y=.fittedPC2, 
-                 color=Fertility,
+                 color=Fertility)) +
+  ggrepel::geom_text_repel(aes(x=.fittedPC1, 
+                 y=.fittedPC2, 
                  label=district)) +
   coord_fixed() + 
   geom_segment(data=df_cocirc,  
-               mapping=aes(x= 4* `1`, 
+               mapping=aes(x= 4 * `1`, 
                            y= 4 * `2`, 
                            linetype=factor(column),
-                           label=column,
+#                           label=column,
                            xend=0, 
                            yend=0), 
                arrow = grid::arrow(ends = "first",
